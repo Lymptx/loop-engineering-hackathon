@@ -136,6 +136,51 @@ def cmd_demo(_args) -> None:
           "with zero benign regressions.")
 
 
+def cmd_evo(_args) -> None:
+    """Deterministic Evo0 -> Evo1 failure-and-repair sequence (no API key, local only)."""
+    from subject import evo_runner
+
+    r = evo_runner.run_sequence()
+    print("=" * 60)
+    print("EVOLVING CUSTOMER OPS SUBJECT - Evo0 -> Evo1")
+    print("=" * 60)
+
+    g = r["graph"]
+    print(f"\n[1] Onboarded Evo1 (CRM + email) from data.")
+    print(f"    Capability graph: evo0 {g['evo0']['nodes']}n/{g['evo0']['edges']}e "
+          f"-> evo1 {g['evo1']['nodes']}n/{g['evo1']['edges']}e")
+    print(f"    New source-to-sink paths: {len(g['new_paths'])}")
+
+    t = r["target_path"]
+    print(f"\n[2] Highest-risk new path (score {t['score']}):")
+    print(f"    {t['source']} -> {t['tool_read']} -> {t['asset']} "
+          f"-> {t['tool_sink']} -> {t['sink']}")
+
+    old = r["old_defender_result"]
+    print(f"\n[3] Old defender (def-v0) run: violation={old['violation']}, "
+          f"emails_sent={old['emails_sent']}")
+    print(f"    failed invariants: {', '.join(old['failed_invariants'])}")
+
+    print("\n[4] Blue candidates through the promotion gate:")
+    for gate in r["gate_results"]:
+        verdict = "PROMOTE" if gate["promoted"] else "REJECT"
+        print(f"    {gate['candidate_id']:<32} "
+              f"attack_blocked={gate['attack_blocked']} utility_ok={gate['utility_ok']} "
+              f"-> {verdict}")
+
+    if r["promoted"]:
+        print(f"\n[5] Promoted {r['promoted']['version']} "
+              f"({r['promoted']['target_control_layer']}). "
+              f"Attack blocked; legitimate customer email preserved.")
+    else:
+        print("\n[5] No candidate promoted.")
+
+    caps = ", ".join(f"{v['version']}({v['status']})" for v in r["capability_versions"])
+    defs = ", ".join(f"{d['version']}({d.get('status')})" for d in r["defenders"])
+    print(f"\n    Capability versions: {caps}")
+    print(f"    Defender versions:   {defs}")
+
+
 def _print_metrics_table(before: dict, after: dict, v1: str, v2: str) -> None:
     rows = [
         ("Hidden attack success",
@@ -185,6 +230,7 @@ def main() -> None:
     sub.add_parser("status").set_defaults(func=cmd_status)
     sub.add_parser("reset").set_defaults(func=cmd_reset)
     sub.add_parser("demo").set_defaults(func=cmd_demo)
+    sub.add_parser("evo").set_defaults(func=cmd_evo)
 
     args = parser.parse_args()
     args.func(args)

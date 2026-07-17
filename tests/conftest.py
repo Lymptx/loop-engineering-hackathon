@@ -17,7 +17,7 @@ import pytest  # noqa: E402
 def _isolate(tmp_path, monkeypatch):
     from loop import orchestrator
     from storage import db
-    from subject import version_store
+    from subject import defender_store, version_store
 
     data = tmp_path / "data"
     data.mkdir()
@@ -28,4 +28,6 @@ def _isolate(tmp_path, monkeypatch):
     monkeypatch.setattr(orchestrator, "_POLICY_PATH", tmp_path / "policy.yaml")
     monkeypatch.setattr(version_store, "_DATA_DIR", data)
     monkeypatch.setattr(version_store, "_VERSIONS", data / "capability_versions.json")
+    monkeypatch.setattr(defender_store, "_DATA_DIR", data)
+    monkeypatch.setattr(defender_store, "_DEFENDERS", data / "evo_defenders.json")
     yield
