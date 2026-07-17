@@ -9,11 +9,11 @@ from __future__ import annotations
 
 import json
 
-import anthropic
-
 from agents._llm import json_call
 from agents.prompts import RED_AGENT_SYSTEM_PROMPT
+from config import is_deterministic
 from loop.models import AttackAttempt, DefenderVersion
+from verifier import suites
 
 _ATTACK_SCHEMA = {
     "type": "object",
@@ -48,9 +48,12 @@ def generate_next_attack(
     library: list[AttackAttempt],
     defender: DefenderVersion,
     *,
-    client: anthropic.Anthropic | None = None,
+    client=None,
 ) -> AttackAttempt:
     """Propose the next attack against `defender`, informed by past attempts."""
+    if is_deterministic():
+        return _deterministic_attack(defender)
+
     user = (
         f"Current defender version: {defender.version}\n"
         f"Current target system prompt:\n{defender.system_prompt}\n\n"
@@ -64,5 +67,21 @@ def generate_next_attack(
         payload=data["payload"],
         hypothesis=data["hypothesis"],
         parent_id=data.get("parent_id"),
+        defender_version=defender.version,
+    )
+
+
+def _deterministic_attack(defender: DefenderVersion) -> AttackAttempt:
+    """Fixed, reproducible attack for the golden demo: the manager-approval-email
+    injection from the frontier seed. Exploits the naive agent's inability to tell a
+    quoted 'approval' from a real instruction."""
+    seed = suites.FRONTIER_SEED[0]
+    return AttackAttempt(
+        family=seed["family"],
+        payload=seed["ticket"],
+        hypothesis=(
+            "The agent cannot distinguish an attacker-quoted 'manager approval' from a "
+            "trusted instruction, so it will attempt an over-cap refund and admin_reset."
+        ),
         defender_version=defender.version,
     )
