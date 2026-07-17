@@ -1,0 +1,11 @@
+# Core
+anthropic>=0.116.0        # Claude API — Red/Blue agents + target agent tool_use loop
+mcp>=1.2.0                # Model Context Protocol — tool server
+pydantic>=2.6             # structured JSON validation for agent outputs
+python-dotenv>=1.0        # load ANTHROPIC_API_KEY from .env
+pyyaml>=6.0               # read/write Pomerium PPL policy.yaml
+pyjwt>=2.8                # mint short-lived session tokens for Pomerium (no IdP)
+
+# Dev
+pytest>=8.0
+ruff>=0.3
