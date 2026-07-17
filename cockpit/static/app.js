@@ -1,5 +1,6 @@
 const stateUrl = "/api/demo/state";
 const targetAgentUrl = "/api/demo/target-agent";
+const gatewayStatusUrl = "/api/demo/gateway-status";
 
 const $ = (id) => document.getElementById(id);
 
@@ -19,6 +20,11 @@ async function fetchState() {
 
 async function fetchTargetAgent() {
   const res = await fetch(targetAgentUrl, { cache: "no-store" });
+  return res.json();
+}
+
+async function fetchGatewayStatus() {
+  const res = await fetch(gatewayStatusUrl, { cache: "no-store" });
   return res.json();
 }
 
@@ -74,7 +80,10 @@ function renderTrace(traces) {
   const trace = traces.at(-1);
   $("trace-label").textContent = trace ? trace.trace_id : "latest";
   $("trace").innerHTML = trace
-    ? `<pre>${escapeHtml(JSON.stringify(trace, null, 2))}</pre>`
+    ? `
+      <div class="meta">Enforcement: ${escapeHtml(trace.enforcement_layer || "recorded policy contract")}</div>
+      <pre>${escapeHtml(JSON.stringify(trace, null, 2))}</pre>
+    `
     : `<pre>Press Start Demo.</pre>`;
 }
 
@@ -404,7 +413,12 @@ function closeTargetModal() {
 }
 
 async function refresh() {
-  render(await fetchState());
+  const [state, gateway] = await Promise.all([fetchState(), fetchGatewayStatus()]);
+  render(state);
+  $("gateway-mode").textContent = gateway.label || gateway.mode;
+  $("gateway-mode").title = gateway.pomerium_url
+    ? `${gateway.pomerium_url} · ${gateway.identity}`
+    : gateway.identity;
 }
 
 $("start-btn").addEventListener("click", async () => {

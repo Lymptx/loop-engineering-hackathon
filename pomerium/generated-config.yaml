@@ -19,3 +19,11 @@ routes:
     allow:
       and:
       - accept: true
+    deny:
+      or:
+      - mcp_tool:
+          is: admin_reset
+      - mcp_tool:
+          is: issue_refund
+      - mcp_tool:
+          is: internal_diagnostics

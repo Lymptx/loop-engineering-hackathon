@@ -1,0 +1,52 @@
+services:
+  pomerium:
+    image: pomerium/pomerium:v0.32.8
+    ports:
+      - "443:443"
+    restart: always
+    environment:
+      POMERIUM_ZERO_TOKEN: ${POMERIUM_ZERO_TOKEN:?set POMERIUM_ZERO_TOKEN in .env}
+      XDG_CACHE_HOME: /var/cache
+    volumes:
+      - pomerium-cache:/var/cache
+    networks:
+      main:
+        aliases:
+          - verify.proven-foal-4676.pomerium.app
+
+  verify:
+    image: pomerium/verify:latest
+    networks:
+      main:
+        aliases:
+          - verify
+
+  tool-server:
+    build:
+      context: .
+      dockerfile: infra/tool-server.Dockerfile
+    environment:
+      PYTHONUNBUFFERED: "1"
+    ports:
+      - "18080:8080"
+    networks:
+      main:
+        aliases:
+          - tool-server
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/healthz', timeout=2)",
+        ]
+      interval: 2s
+      timeout: 3s
+      retries: 15
+
+networks:
+  main: {}
+
+volumes:
+  pomerium-cache:

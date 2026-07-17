@@ -17,14 +17,26 @@ services:
       - "18081:18081"
     command: ["-config", "/pomerium/config.yaml"]
     depends_on:
-      - tool-server
+      tool-server:
+        condition: service_healthy
 
   tool-server:
     build:
       context: ..
-      dockerfile: infra/tool-server.Dockerfile   # TODO(step 6): add this Dockerfile
+      dockerfile: infra/tool-server.Dockerfile
     environment:
       - PYTHONUNBUFFERED=1
     ports:
       - "18080:8080"
     command: ["python", "-m", "sandbox.tool_server"]
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/healthz', timeout=2)",
+        ]
+      interval: 2s
+      timeout: 3s
+      retries: 15

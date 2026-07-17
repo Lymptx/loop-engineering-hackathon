@@ -83,21 +83,61 @@ demo run with it uninstalled and no key set. Live mode swaps in real Claude call
 
 ---
 
-## Pomerium / MCP — honest status
+## Pomerium / MCP — two enforcement lanes
 
-The tool-policy is enforced by [`pomerium/ppl.py`](./pomerium/ppl.py), a **laptop
-simulator of Pomerium Policy Language semantics** (deny-overrides-allow, per-tool
-`mcp_tool` matching, session-claim conditions). It is **not** Pomerium, and the golden
-demo needs no gateway, no containers, and no external services.
+Pomerium is the external enforcement plane for privileged agent tools. Blue promotes
+[`pomerium/policy.yaml`](./pomerium/policy.yaml); every target tool call crosses the
+gateway contract and receives an explicit allow/deny decision.
 
-**`USE_POMERIUM=1` is not implemented** — [`sandbox/gateway.py`](./sandbox/gateway.py)
-raises a clear error, and [`sandbox/tool_server.py`](./sandbox/tool_server.py) is a
-skeleton, not a wired-up MCP server. Standing up a real Pomerium gateway +
-`docker-compose` is step 6 (see [`infra/`](./infra) and `basic_plan.md §9–12`); it is
-optional and not required for anything above.
+| Lane | Setting | Enforcement | Purpose |
+|---|---|---|---|
+| deterministic (default) | `USE_POMERIUM=0` | [`pomerium/ppl.py`](./pomerium/ppl.py) | offline CI, claim-aware candidate gates |
+| real MCP gateway | `USE_POMERIUM=1` | `pomerium/pomerium:main` → [`sandbox/tool_server.py`](./sandbox/tool_server.py) | judge-visible native `mcp_tool` enforcement and audit logs |
 
-Documented MVP boundaries of the simulator: only `routes[0]` is evaluated; an absent
-`allow` block is permissive (fail-open); a malformed policy fails closed (denied).
+The simulator implements deny-overrides-allow, `mcp_tool`, and request-context claims
+such as `human_confirmed` and `refund_amount`. Real local mode uses Pomerium's
+experimental MCP proxy and native tool-name policies. Because local mode has no IdP,
+[`pomerium/local_config.py`](./pomerium/local_config.py) conservatively converts
+claim-conditioned high-risk branches to tool-name denies. It does **not** claim JWT
+or per-request claim parity.
+
+Real-gateway proof (Docker Desktop required):
+
+```bash
+python -m pomerium.local_config
+docker compose -f pomerium/docker-compose.yaml up --build
+# in another terminal:
+python scripts/pomerium_smoke.py
+# application-level proof with enforcement metadata + audit events:
+USE_POMERIUM=1 python scripts/pomerium_judge_demo.py
+```
+
+The smoke script proves both paths: `lookup_order` is allowed and
+`internal_diagnostics` is denied by Pomerium. Set
+`POMERIUM_SERVICE_ACCOUNT_TOKEN` only when connecting to an authenticated Pomerium
+route; no token is needed for the local `allow: accept` judge proof.
+
+### Pomerium Zero
+
+The root [`compose.yaml`](./compose.yaml) runs the Pomerium Zero connector, the
+official Verify app, and this project's MCP tool server. Put the Zero enrollment
+token in the gitignored root `.env`:
+
+```dotenv
+POMERIUM_ZERO_TOKEN=replace-with-a-fresh-token
+```
+
+Then run `docker compose up -d`. In Pomerium Zero, configure the MCP route upstream
+as `http://tool-server:8080/mcp` and enable MCP server mode plus the native
+`mcp_tool` deny policy. The token enrolls the connector; it is not the per-request
+service-account token used by an MCP client.
+
+The golden `python main.py demo` remains deterministic by design. Candidate policies
+are evaluated in-process before promotion; the promoted policy regenerates
+`pomerium/generated-config.yaml` for the real gateway lane.
+
+Documented simulator boundaries: only `routes[0]` is evaluated; absent `allow` is
+permissive; malformed policy fails closed.
 
 ---
 

@@ -1,10 +1,13 @@
 """Laptop simulator of Pomerium Policy Language (PPL) — NOT Pomerium itself.
 
 This lets the loop run and enforce tool-policy on a laptop with NO running Pomerium
-container and NO external services. It implements the subset of PPL semantics the
-demo relies on, so laptop mode and a real gateway would decide the same way. When
-USE_POMERIUM=1 the real gateway would enforce instead (that path is not implemented
-in this repo — see sandbox/gateway.py and the README).
+container and NO external services. It implements the claim-aware subset the
+deterministic demo relies on. With USE_POMERIUM=1, live-policy calls instead traverse
+the local Pomerium MCP proxy; see sandbox/gateway.py and pomerium/local_config.py.
+
+The real local route can enforce native ``mcp_tool`` criteria. Request-context
+claims such as refund amount are simulator-only until an IdP/service-account path
+provides those claims to Pomerium.
 
 Semantics implemented (matching Pomerium):
   * Deny always overrides allow.
