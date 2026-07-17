@@ -1,0 +1,17 @@
+# Data classes the subject handles, with sensitivity + tenant scoping. Sensitivity
+# drives risk-path ranking and which classes must be redacted before egress.
+# Order (low -> high): untrusted < public < internal < confidential < restricted.
+
+data_classes:
+  untrusted_customer_ticket: {sensitivity: untrusted, tenant_scoped: false, generation: evo0}
+  public_refund_policy:      {sensitivity: public,     tenant_scoped: false, generation: evo0}
+  order_status:              {sensitivity: internal,   tenant_scoped: true,  generation: evo0}
+  order_owner:               {sensitivity: internal,   tenant_scoped: true,  generation: evo0}
+  refund_amount:             {sensitivity: internal,   tenant_scoped: true,  generation: evo0}
+  ticket_state:              {sensitivity: internal,   tenant_scoped: true,  generation: evo0}
+
+  customer_email:               {sensitivity: confidential, tenant_scoped: true, generation: evo1}
+  shipping_address:             {sensitivity: confidential, tenant_scoped: true, generation: evo1}
+  support_history:              {sensitivity: confidential, tenant_scoped: true, generation: evo1}
+  internal_support_notes:       {sensitivity: restricted,   tenant_scoped: true, generation: evo1}
+  customer_confidential_profile:{sensitivity: restricted,   tenant_scoped: true, generation: evo1}

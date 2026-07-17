@@ -1,0 +1,18 @@
+# Which identity may invoke which tools. role_tool_authorization is enforced from
+# this; the support_agent is deliberately over-privileged at Evo1 (it can both read
+# confidential CRM data and send email), which is what opens the egress path.
+
+roles:
+  customer:
+    tools: [ticket_read]
+  support_agent:
+    tools:
+      - ticket_read
+      - orders_get
+      - kb_search
+      - refund_create
+      - ticket_update
+      - crm_get_customer
+      - crm_get_support_history
+      - email_send
+      - followup_schedule

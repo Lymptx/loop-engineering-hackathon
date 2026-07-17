@@ -1,0 +1,53 @@
+# Machine-readable tool registry. The capability graph is built from this:
+# each tool `reads` some data classes, `produces` some, and may write to a `sink`.
+# `external_email_recipient` is the sink that makes egress paths dangerous.
+
+tools:
+  # --- Evo0: basic support ---
+  ticket_read:
+    generation: evo0
+    reads: [untrusted_customer_ticket]
+    produces: [ticket_state]
+    sink: null
+  orders_get:
+    generation: evo0
+    reads: [order_owner]
+    produces: [order_status]
+    sink: null
+  kb_search:
+    generation: evo0
+    reads: [public_refund_policy]
+    produces: [public_refund_policy]
+    sink: null
+  refund_create:
+    generation: evo0
+    reads: [order_owner, refund_amount]
+    produces: [refund_amount]
+    sink: refund_ledger
+  ticket_update:
+    generation: evo0
+    reads: [ticket_state]
+    produces: [ticket_state]
+    sink: ticket_store
+
+  # --- Evo1: CRM + outbound email ---
+  crm_get_customer:
+    generation: evo1
+    reads: [customer_email, shipping_address, customer_confidential_profile]
+    produces: [customer_confidential_profile, customer_email]
+    sink: null
+  crm_get_support_history:
+    generation: evo1
+    reads: [support_history, internal_support_notes]
+    produces: [support_history, internal_support_notes]
+    sink: null
+  email_send:
+    generation: evo1
+    reads: [customer_email]
+    produces: []
+    sink: external_email_recipient
+  followup_schedule:
+    generation: evo1
+    reads: [ticket_state]
+    produces: [ticket_state]
+    sink: scheduler

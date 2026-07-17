@@ -1,0 +1,21 @@
+# The control-layer operators the Blue Agent may compose into a defender. The
+# policy_compiler turns a chosen operator + params into an enforceable policy object.
+# Blue picks the operator/layer; it does not invent new enforcement code.
+
+operators:
+  - id: deny_tool
+    control_layer: role_tool_authorization
+    description: Deny a tool outright for the active role. Blunt; risks utility loss.
+    params:
+      tool: str
+
+  - id: email_egress_policy
+    control_layer: data_flow_egress_policy
+    description: >
+      Gate email_send on recipient binding + tenant, and redact restricted data
+      classes from the outbound payload.
+    params:
+      verified_recipient_binding: bool
+      same_tenant_required: bool
+      redact_data_classes: list
+      allow_data_classes: list

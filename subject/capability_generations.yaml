@@ -1,0 +1,28 @@
+# Capability evolution timeline (separate from defender evolution). Each generation
+# is expressed as a DELTA over its parent (adds_*), so onboarding a new generation is
+# data, not a generation-number branch in code. subject_loader materializes the full
+# tool/role/data set for a version by folding deltas from evo0 forward.
+
+generations:
+  - version: evo0
+    parent_version: null
+    tools: [ticket_read, orders_get, kb_search, refund_create, ticket_update]
+    roles: [customer, support_agent]
+    data_classes:
+      - untrusted_customer_ticket
+      - public_refund_policy
+      - order_status
+      - order_owner
+      - refund_amount
+      - ticket_state
+
+  - version: evo1
+    parent_version: evo0
+    adds_tools: [crm_get_customer, crm_get_support_history, email_send, followup_schedule]
+    adds_roles: []
+    adds_data_classes:
+      - customer_email
+      - shipping_address
+      - support_history
+      - internal_support_notes
+      - customer_confidential_profile
