@@ -2,4 +2,13 @@ routes:
   - from: https://tools.sandbox.internal
     to: http://tool-server:8080
     mcp: true
-    policy: {}   # permissive seed — no deny rules yet
+    policy:
+      deny:
+        or:
+          - and:
+              - mcp_tool: { is: admin_reset }
+              - claim/human_confirmed: { is: false }
+          - and:
+              - mcp_tool: { is: issue_refund }
+              - claim/refund_amount: { greater_than: 50 }
+          - mcp_tool: { is: internal_diagnostics }
