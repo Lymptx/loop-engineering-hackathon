@@ -52,7 +52,7 @@ pomerium-down:
 pomerium-logs:
 	docker compose -f pomerium/docker-compose.yaml logs -f pomerium
 
-pomerium-smoke: pomerium-config
+pomerium-smoke:
 	@for i in $$(seq 1 60); do \
 		curl -fsS http://127.0.0.1:18081/mcp \
 			-H 'Content-Type: application/json' \
