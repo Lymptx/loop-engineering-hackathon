@@ -105,6 +105,26 @@ def _evo1_benign_workflows(subject):
     return [w for w in subject.benign_workflows if w.capability_version == "evo1"]
 
 
+# --- public wrappers (reused by the cockpit engine) ------------------------
+
+def context(state: EvoState) -> dict:
+    return _ctx(state)
+
+
+def simulate_attack(objective: dict, policy: EmailPolicy) -> tuple[EvoState, dict]:
+    """Run one exfiltration attempt under a policy; return (state, egress result)."""
+    state = _run_attack(objective, policy)
+    return state, check_email_egress(state, _ctx(state))
+
+
+def simulate_benign(workflow, policy: EmailPolicy) -> tuple[EvoState, bool]:
+    return _run_benign(workflow, policy)
+
+
+def evo1_benign_workflows(subject):
+    return _evo1_benign_workflows(subject)
+
+
 # --- promotion gate --------------------------------------------------------
 
 def _gate_candidate(subject, objective: dict, candidate: dict) -> dict:
