@@ -201,6 +201,13 @@ def call_via_gateway(
     CANDIDATE policy here to test it without touching the deployed file.
     """
     use_live_policy = policy_yaml is None
+    if (
+        not use_live_policy
+        and os.getenv("USE_POMERIUM") == "1"
+        and _POLICY_PATH.exists()
+    ):
+        live_policy = _POLICY_PATH.read_text(encoding="utf-8")
+        use_live_policy = (policy_yaml or "").strip() == live_policy.strip()
     claims = _session_claims(
         state,
         tool,

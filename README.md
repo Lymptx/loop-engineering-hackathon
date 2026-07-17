@@ -85,19 +85,36 @@ demo run with it uninstalled and no key set. Live mode swaps in real Claude call
 
 ## Pomerium / MCP — honest status
 
-The tool-policy is enforced by [`pomerium/ppl.py`](./pomerium/ppl.py), a **laptop
-simulator of Pomerium Policy Language semantics** (deny-overrides-allow, per-tool
-`mcp_tool` matching, session-claim conditions). It is **not** Pomerium, and the golden
-demo needs no gateway, no containers, and no external services.
+Default demos/tests still use [`pomerium/ppl.py`](./pomerium/ppl.py), a laptop
+simulator of Pomerium Policy Language semantics. This keeps `make demo` and
+`make test` deterministic, offline, and fast.
 
-**`USE_POMERIUM=1` is not implemented** — [`sandbox/gateway.py`](./sandbox/gateway.py)
-raises a clear error, and [`sandbox/tool_server.py`](./sandbox/tool_server.py) is a
-skeleton, not a wired-up MCP server. Standing up a real Pomerium gateway +
-`docker-compose` is step 6 (see [`infra/`](./infra) and `basic_plan.md §9–12`); it is
-optional and not required for anything above.
+`USE_POMERIUM=1` now routes real tool calls through a local Docker Pomerium gateway:
 
-Documented MVP boundaries of the simulator: only `routes[0]` is evaluated; an absent
-`allow` block is permissive (fail-open); a malformed policy fails closed (denied).
+```bash
+make pomerium-up
+USE_POMERIUM=1 POMERIUM_URL=http://127.0.0.1:18081/mcp python main.py run-round
+make pomerium-smoke
+```
+
+The real path is:
+
+```
+Target Agent -> sandbox.gateway -> Pomerium MCP route -> sandbox.tool_server -> tools.py
+```
+
+[`pomerium/local_config.py`](./pomerium/local_config.py) turns the live defense
+artifact [`pomerium/policy.yaml`](./pomerium/policy.yaml) into
+[`pomerium/generated-config.yaml`](./pomerium/generated-config.yaml), the complete
+local config Docker Pomerium reads. Pomerium authorizer logs include `mcp-method`,
+`mcp-tool`, and `mcp-tool-parameters`.
+
+Boundary: local Docker mode uses `allow: accept` so agent-to-tool calls can run
+without wiring Google/Okta/OIDC. That means no browser login prompt in the demo
+path. Browser authorization requires a real HTTPS route plus an identity provider
+or Pomerium service-account flow. Also, real Pomerium MCP PPL primarily enforces
+tool-name rules (`mcp_tool`); the in-process simulator still covers hackathon-only
+request-claim checks like `refund_amount > 50`.
 
 ---
 

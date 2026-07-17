@@ -15,12 +15,10 @@
 # The generated config uses insecure local HTTP on 127.0.0.1:18081 and injects
 # `allow: accept` so agent-to-tool calls can be tested without OIDC.
 
-# For the hackathon we skip a real OIDC IdP. The test harness mints a short-lived
-# signed JWT carrying claims like human_confirmed=false (attacker) / true
-# (legitimate) and passes it as the session token. See sandbox/gateway.py.
-#
-# TODO(step 6): set the signing key / shared secret so Pomerium validates the JWT
-# minted with POMERIUM_JWT_SECRET.
+# Browser/OIDC authorization is intentionally not configured in local Docker mode.
+# If you want an interactive login prompt, replace the generated `allow: accept`
+# route with a normal authenticated Pomerium route and configure a real IdP or
+# service-account token flow.
 
 # Routes are defined in policy.yaml. In a real single-file Pomerium config you
 # would place the `routes:` block here; this repo keeps it in policy.yaml so the
