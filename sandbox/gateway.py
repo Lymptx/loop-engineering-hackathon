@@ -1,9 +1,12 @@
 """The tool-call gateway the target agent goes through — never the tool server directly.
 
-In laptop mode (USE_POMERIUM=0) this evaluates pomerium/policy.yaml locally via
-pomerium/ppl.py, then dispatches to sandbox/tools.py. In gateway mode
-(USE_POMERIUM=1) it forwards a tools/call MCP request to a running Pomerium, which
-enforces the same policy and proxies to tool_server.py.
+In laptop mode (USE_POMERIUM=0, the default and the golden-demo path) this enforces
+the tool-policy IN-PROCESS via pomerium/ppl.py — a local simulator of Pomerium PPL
+semantics, not Pomerium itself — then dispatches to sandbox/tools.py.
+
+Gateway mode (USE_POMERIUM=1) is NOT implemented in this repo: it would forward a
+tools/call MCP request to a running Pomerium that enforces the same policy. The stub
+below raises a clear error so nothing silently pretends a real gateway is in play.
 
 Either way, the contract is identical: a denied call returns a 403-style result,
 and the verifier can tell an *enforced* block apart from the agent simply choosing
