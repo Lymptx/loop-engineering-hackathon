@@ -25,7 +25,8 @@ No `make`? Use the CLI directly:
 
 ```bash
 python -m pytest -q            # tests
-python main.py demo           # golden demo
+python main.py demo           # Evo0 golden demo (refund/admin attack)
+python main.py evo            # Evo0 -> Evo1 evolving-subject demo
 python main.py status         # current defender + attack library
 python main.py reset          # wipe state, restore seed policy
 ```
@@ -97,6 +98,28 @@ Documented MVP boundaries of the simulator: only `routes[0]` is evaluated; an ab
 `allow` block is permissive (fail-open); a malformed policy fails closed (denied).
 
 ---
+
+## Evolving subject (Evo0 → Evo1)
+
+Beyond the static refund/admin demo, the target is modeled as an **evolving benchmark
+subject** under [`subject/`](./subject): machine-readable source files
+(`tool_registry.yaml`, `data_catalog.yaml`, `capability_generations.yaml`, …) describe
+what the agent can do per capability generation. `make evo` (or `python main.py evo`)
+runs the deterministic Evo0 → Evo1 failure-and-repair sequence:
+
+```
+onboard Evo1 (CRM + email) from data
+-> capability graph diff finds  untrusted_ticket -> customer_confidential_profile -> external_email
+-> old defender (def-v0) emails confidential CRM data to an attacker recipient (verifier flags it)
+-> blue proposes 2 candidates
+   - A: deny all email_send        -> REJECTED (breaks the legitimate follow-up email)
+   - B: verified-recipient + same-tenant + redaction -> PROMOTED (blocks attack, keeps utility)
+-> def-v1 promoted; capability and defender versions are tracked on independent timelines
+```
+
+`subject/attack_surface_matrix.jsonl` is **generated** from the source files
+(`make matrix`), never hand-edited. Evo2/Evo3 generations are described in the source
+data but not yet implemented — Evo0 → Evo1 is the mandatory complete milestone.
 
 ## Layout
 
