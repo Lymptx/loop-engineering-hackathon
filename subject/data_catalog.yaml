@@ -14,4 +14,4 @@ data_classes:
   shipping_address:             {sensitivity: confidential, tenant_scoped: true, generation: evo1}
   support_history:              {sensitivity: confidential, tenant_scoped: true, generation: evo1}
   internal_support_notes:       {sensitivity: restricted,   tenant_scoped: true, generation: evo1}
-  customer_confidential_profile:{sensitivity: restricted,   tenant_scoped: true, generation: evo1}
+  customer_confidential_profile: {sensitivity: restricted, tenant_scoped: true, generation: evo1}
