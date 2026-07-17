@@ -352,9 +352,9 @@ def _live_handle(
     policy_yaml: str | None,
     client=None,
 ) -> dict:
-    import anthropic  # lazy: deterministic mode never needs the dependency
+    from agents.llm_client import make_client, model_id  # lazy: deterministic skips this
 
-    client = client or anthropic.Anthropic()
+    client = client or make_client()
     messages: list[dict] = [{"role": "user", "content": ticket_text}]
     tool_calls: list[dict] = []
     final_text = ""
@@ -362,7 +362,7 @@ def _live_handle(
 
     for turn in range(_MAX_TURNS):
         resp = client.messages.create(
-            model=_MODEL,
+            model=model_id(),
             max_tokens=2048,
             system=system_prompt,
             tools=TOOL_DEFS,

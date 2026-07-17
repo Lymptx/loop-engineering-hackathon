@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import json
+import os
+from functools import lru_cache
 from pathlib import Path
 from threading import RLock
 
@@ -21,12 +23,85 @@ _TRACES = _DATA_DIR / "traces.json"
 
 _LOCK = RLock()
 
+_ALL_PATHS = (
+    _RUNS, _EVENTS, _ATTACK_BUNDLES, _DEFENDER_BUNDLES, _ATTEMPTS,
+    _CANDIDATES, _METRICS, _HISTORY, _TRACES,
+)
+
+
+# --- backend selection -----------------------------------------------------
+# STORAGE_BACKEND=json (default) -> per-collection JSON files under storage/data/cockpit/
+# STORAGE_BACKEND=dynamodb       -> a single DynamoDB table (pk=collection, sk=index),
+#                                   so the whole cockpit — compute AND the data the UI
+#                                   reads — lives on AWS. Same flag the CLI loop uses.
+
+def _is_dynamo() -> bool:
+    return os.getenv("STORAGE_BACKEND", "json").strip().lower() in ("dynamodb", "dynamo", "aws")
+
+
+def _coll(path: Path) -> str:
+    return path.stem  # "events", "runs", "attack_bundles", ...
+
+
+@lru_cache(maxsize=1)
+def _table():
+    import boto3
+
+    return boto3.resource(
+        "dynamodb", region_name=os.getenv("AWS_REGION", "us-east-1")
+    ).Table(os.getenv("COCKPIT_TABLE", "Cockpit"))
+
+
+def _ddb_read(coll: str) -> list[dict]:
+    from boto3.dynamodb.conditions import Key
+
+    table, items, kwargs = _table(), [], {"KeyConditionExpression": Key("pk").eq(coll)}
+    while True:
+        resp = table.query(**kwargs)
+        items.extend(resp.get("Items", []))
+        if "LastEvaluatedKey" not in resp:
+            break
+        kwargs["ExclusiveStartKey"] = resp["LastEvaluatedKey"]
+    items.sort(key=lambda i: i["sk"])
+    return [json.loads(i["data"]) for i in items]
+
+
+def _ddb_clear(coll: str) -> None:
+    from boto3.dynamodb.conditions import Key
+
+    table = _table()
+    kwargs = {"KeyConditionExpression": Key("pk").eq(coll), "ProjectionExpression": "pk, sk"}
+    with table.batch_writer() as batch:
+        while True:
+            resp = table.query(**kwargs)
+            for it in resp.get("Items", []):
+                batch.delete_item(Key={"pk": it["pk"], "sk": it["sk"]})
+            if "LastEvaluatedKey" not in resp:
+                break
+            kwargs["ExclusiveStartKey"] = resp["LastEvaluatedKey"]
+
+
+def _ddb_write(coll: str, rows: list[dict]) -> None:
+    _ddb_clear(coll)
+    with _table().batch_writer() as batch:
+        for n, row in enumerate(rows, 1):
+            batch.put_item(Item={"pk": coll, "sk": f"{n:06d}", "data": json.dumps(row)})
+
+
+def _ddb_append(coll: str, row: dict) -> None:
+    n = len(_ddb_read(coll)) + 1
+    _table().put_item(Item={"pk": coll, "sk": f"{n:06d}", "data": json.dumps(row)})
+
+
+# --- storage primitives (backend-aware) ------------------------------------
 
 def _ensure_dirs() -> None:
     _DATA_DIR.mkdir(parents=True, exist_ok=True)
 
 
 def _read(path: Path) -> list[dict]:
+    if _is_dynamo():
+        return _ddb_read(_coll(path))
     if not path.exists():
         return []
     try:
@@ -37,6 +112,9 @@ def _read(path: Path) -> list[dict]:
 
 
 def _write(path: Path, rows: list[dict]) -> None:
+    if _is_dynamo():
+        _ddb_write(_coll(path), rows)
+        return
     _ensure_dirs()
     tmp = path.with_suffix(f"{path.suffix}.tmp")
     tmp.write_text(json.dumps(rows, indent=2), encoding="utf-8")
@@ -45,6 +123,9 @@ def _write(path: Path, rows: list[dict]) -> None:
 
 def _append(path: Path, row: dict) -> None:
     with _LOCK:
+        if _is_dynamo():
+            _ddb_append(_coll(path), row)
+            return
         rows = _read(path)
         rows.append(row)
         _write(path, rows)
@@ -53,17 +134,11 @@ def _append(path: Path, row: dict) -> None:
 def reset() -> None:
     """Clear mutable cockpit run state. Subject version stores are not touched here."""
     with _LOCK:
-        for path in (
-            _RUNS,
-            _EVENTS,
-            _ATTACK_BUNDLES,
-            _DEFENDER_BUNDLES,
-            _ATTEMPTS,
-            _CANDIDATES,
-            _METRICS,
-            _HISTORY,
-            _TRACES,
-        ):
+        if _is_dynamo():
+            for path in _ALL_PATHS:
+                _ddb_clear(_coll(path))
+            return
+        for path in _ALL_PATHS:
             if path.exists():
                 path.unlink()
 
