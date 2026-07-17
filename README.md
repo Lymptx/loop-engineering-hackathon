@@ -19,6 +19,7 @@ pip install -r requirements.txt
 
 make test        # deterministic — no API key, no network
 make demo        # the golden demo — no API key, no network
+make cockpit     # live web cockpit — open http://127.0.0.1:8765
 ```
 
 No `make`? Use the CLI directly:
@@ -27,6 +28,7 @@ No `make`? Use the CLI directly:
 python -m pytest -q            # tests
 python main.py demo           # Evo0 golden demo (refund/admin attack)
 python main.py evo            # Evo0 -> Evo1 evolving-subject demo
+python -m cockpit.server      # live cockpit API + frontend
 python main.py status         # current defender + attack library
 python main.py reset          # wipe state, restore seed policy
 ```
@@ -121,9 +123,40 @@ onboard Evo1 (CRM + email) from data
 (`make matrix`), never hand-edited. Evo2/Evo3 generations are described in the source
 data but not yet implemented — Evo0 → Evo1 is the mandatory complete milestone.
 
+## Live cockpit
+
+`make cockpit` starts a local web dashboard at `http://127.0.0.1:8765`. Press
+**Start Demo** to run the deterministic persistent co-evolution loop from
+Evo0 through Evo3:
+
+```
+Evo0 baseline
+-> Evo1 CRM + outbound email
+-> new CRM-to-email attack bundle
+-> old defender fails real verifier checks
+-> over-broad email denial rejected by benign regression
+-> refined recipient-binding/redaction defender promoted
+-> Evo2 finance/fraud/approval introduces forged-approval bulk-refund risk
+-> approval-provenance defender promoted
+-> Evo3 memory/attachments/connectors introduces memory-poisoning risk
+-> memory quarantine/provenance defender promoted
+```
+
+The cockpit panels are backed by JSON records under `storage/data/cockpit/`:
+loop events, attack attempts, verifier-backed traces, attacker bundles, defender
+bundles, defense candidates, metrics, and generation history. Restarting the
+server does not clear this history; use the cockpit Reset button or `make reset`
+when you want a fresh run.
+
+Implementation boundary: Evo1 uses the full local CRM/email sandbox and frozen
+egress verifier. Evo2/Evo3 currently use deterministic local cockpit traces and
+promotion records over the same persisted loop contract; their specialized
+fraud/approval and memory/connector sandboxes are the next hardening step.
+
 ## Layout
 
 ```
+cockpit/     standard-library web cockpit + persistent event/demo records
 loop/         orchestrator.py (the loop) + models.py (AttackAttempt, DefenderVersion)
 agents/       red_agent, blue_agent, prompts, _llm (live adapter)
 sandbox/      tools, state (+ canary), gateway, target_agent, tool_server

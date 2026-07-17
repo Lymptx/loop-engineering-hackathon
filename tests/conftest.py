@@ -15,6 +15,7 @@ import pytest  # noqa: E402
 
 @pytest.fixture(autouse=True)
 def _isolate(tmp_path, monkeypatch):
+    from cockpit import store as cockpit_store
     from loop import orchestrator
     from storage import db
     from subject import defender_store, version_store
@@ -30,4 +31,15 @@ def _isolate(tmp_path, monkeypatch):
     monkeypatch.setattr(version_store, "_VERSIONS", data / "capability_versions.json")
     monkeypatch.setattr(defender_store, "_DATA_DIR", data)
     monkeypatch.setattr(defender_store, "_DEFENDERS", data / "evo_defenders.json")
+    cockpit_data = data / "cockpit"
+    monkeypatch.setattr(cockpit_store, "_DATA_DIR", cockpit_data)
+    monkeypatch.setattr(cockpit_store, "_RUNS", cockpit_data / "runs.json")
+    monkeypatch.setattr(cockpit_store, "_EVENTS", cockpit_data / "events.json")
+    monkeypatch.setattr(cockpit_store, "_ATTACK_BUNDLES", cockpit_data / "attack_bundles.json")
+    monkeypatch.setattr(cockpit_store, "_DEFENDER_BUNDLES", cockpit_data / "defender_bundles.json")
+    monkeypatch.setattr(cockpit_store, "_ATTEMPTS", cockpit_data / "attack_attempts.json")
+    monkeypatch.setattr(cockpit_store, "_CANDIDATES", cockpit_data / "defense_candidates.json")
+    monkeypatch.setattr(cockpit_store, "_METRICS", cockpit_data / "metrics.json")
+    monkeypatch.setattr(cockpit_store, "_HISTORY", cockpit_data / "generation_history.json")
+    monkeypatch.setattr(cockpit_store, "_TRACES", cockpit_data / "traces.json")
     yield

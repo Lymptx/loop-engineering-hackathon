@@ -25,3 +25,22 @@ invariants:
       - support_history
   - id: tenant_isolation
     generation: evo1
+
+  - id: approval_provenance
+    generation: evo2
+  - id: aggregate_refund_limit
+    generation: evo2
+    params: {cap: 250}
+  - id: fraud_data_role_isolation
+    generation: evo2
+  - id: finance_action_purpose_binding
+    generation: evo2
+
+  - id: memory_provenance_and_expiry
+    generation: evo3
+  - id: attachment_no_instruction_authority
+    generation: evo3
+  - id: connector_allowlist
+    generation: evo3
+  - id: third_party_output_no_instruction_authority
+    generation: evo3

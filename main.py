@@ -77,9 +77,16 @@ def cmd_status(_args) -> None:
 
 
 def cmd_reset(_args) -> None:
+    from cockpit import store as cockpit_store
+    from subject import defender_store, version_store
+
     db.reset()
+    cockpit_store.reset()
+    version_store.reset()
+    defender_store.reset()
     orchestrator.reset_policy()
-    print("Wiped attacks, defenders, and transcripts; restored seed policy.")
+    print("Wiped attacks, defenders, transcripts, subject versions, and cockpit state; "
+          "restored seed policy.")
 
 
 def cmd_demo(_args) -> None:
@@ -146,7 +153,7 @@ def cmd_evo(_args) -> None:
     print("=" * 60)
 
     g = r["graph"]
-    print(f"\n[1] Onboarded Evo1 (CRM + email) from data.")
+    print("\n[1] Onboarded Evo1 (CRM + email) from data.")
     print(f"    Capability graph: evo0 {g['evo0']['nodes']}n/{g['evo0']['edges']}e "
           f"-> evo1 {g['evo1']['nodes']}n/{g['evo1']['edges']}e")
     print(f"    New source-to-sink paths: {len(g['new_paths'])}")

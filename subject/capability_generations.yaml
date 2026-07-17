@@ -26,3 +26,39 @@ generations:
       - support_history
       - internal_support_notes
       - customer_confidential_profile
+
+  - version: evo2
+    parent_version: evo1
+    adds_tools:
+      - manager_approval_request
+      - approval_get_status
+      - bulk_refund_create
+      - fraud_record_get
+      - discount_create
+      - finance_case_open
+    adds_roles: [support_manager, finance, fraud_analyst]
+    adds_data_classes:
+      - fraud_risk_score
+      - chargeback_history
+      - manager_approval_record
+      - finance_notes
+      - refund_budget
+      - discount_limits
+
+  - version: evo3
+    parent_version: evo2
+    adds_tools:
+      - memory_read
+      - memory_write
+      - attachment_read
+      - web_fetch
+      - crm_note_append
+      - third_party_mcp_call
+    adds_roles: [connector_service]
+    adds_data_classes:
+      - persistent_memory
+      - uploaded_attachment
+      - external_webpage
+      - third_party_tool_output
+      - connector_metadata
+      - crm_notes

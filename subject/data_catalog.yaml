@@ -15,3 +15,17 @@ data_classes:
   support_history:              {sensitivity: confidential, tenant_scoped: true, generation: evo1}
   internal_support_notes:       {sensitivity: restricted,   tenant_scoped: true, generation: evo1}
   customer_confidential_profile: {sensitivity: restricted, tenant_scoped: true, generation: evo1}
+
+  fraud_risk_score:        {sensitivity: restricted,   tenant_scoped: true, generation: evo2}
+  chargeback_history:      {sensitivity: confidential, tenant_scoped: true, generation: evo2}
+  manager_approval_record: {sensitivity: internal,     tenant_scoped: true, generation: evo2}
+  finance_notes:           {sensitivity: restricted,   tenant_scoped: true, generation: evo2}
+  refund_budget:           {sensitivity: internal,     tenant_scoped: true, generation: evo2}
+  discount_limits:         {sensitivity: internal,     tenant_scoped: true, generation: evo2}
+
+  persistent_memory:       {sensitivity: internal,     tenant_scoped: true,  generation: evo3}
+  uploaded_attachment:     {sensitivity: untrusted,    tenant_scoped: false, generation: evo3}
+  external_webpage:        {sensitivity: untrusted,    tenant_scoped: false, generation: evo3}
+  third_party_tool_output: {sensitivity: untrusted,    tenant_scoped: false, generation: evo3}
+  connector_metadata:      {sensitivity: internal,     tenant_scoped: false, generation: evo3}
+  crm_notes:               {sensitivity: confidential, tenant_scoped: true,  generation: evo3}

@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Agent Immune CI Cockpit</title>
+  <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="mark"></span>
+      <div>
+        <h1>Agent Immune CI Cockpit</h1>
+        <p id="run-subtitle">persistent co-evolution loop</p>
+      </div>
+    </div>
+    <div class="status-strip">
+      <div><span>Evo</span><strong id="current-evo">evo0</strong></div>
+      <div><span>Defender</span><strong id="active-defender">def-v0</strong></div>
+      <div><span>Phase</span><strong id="phase">idle</strong></div>
+      <div><span>Status</span><strong id="run-status">idle</strong></div>
+    </div>
+    <div class="actions">
+      <button id="reset-btn" type="button">Reset</button>
+      <button id="start-btn" type="button">Start Demo</button>
+    </div>
+  </header>
+
+  <main class="layout">
+    <section class="panel attack-stream">
+      <div class="panel-head">
+        <h2>Attack Stream</h2>
+        <span id="attempt-count">0 attempts</span>
+      </div>
+      <div id="attempts" class="list"></div>
+    </section>
+
+    <section class="panel trace-panel">
+      <div class="panel-head">
+        <h2>Protected Subject Trace</h2>
+        <span id="trace-label">latest</span>
+      </div>
+      <div id="trace" class="trace"></div>
+    </section>
+
+    <aside class="side">
+      <section class="panel bundle-panel">
+        <div class="panel-head">
+          <h2>Attacker Bundles</h2>
+          <span id="attacker-bundle-count">0</span>
+        </div>
+        <div id="attacker-bundles" class="bundle-list"></div>
+      </section>
+
+      <section class="panel bundle-panel">
+        <div class="panel-head">
+          <h2>Defender Bundles</h2>
+          <span id="defender-bundle-count">0</span>
+        </div>
+        <div id="defender-bundles" class="bundle-list"></div>
+      </section>
+    </aside>
+
+    <section class="panel metrics-panel">
+      <div class="panel-head">
+        <h2>Metrics</h2>
+        <span id="metric-defender">no data</span>
+      </div>
+      <div id="metrics" class="metric-grid"></div>
+    </section>
+
+    <section class="panel history-panel">
+      <div class="panel-head">
+        <h2>Generation History</h2>
+        <span id="history-count">0 rows</span>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Evo</th>
+              <th>Defender</th>
+              <th>Family</th>
+              <th>Attack</th>
+              <th>Benign</th>
+              <th>Policy Diff</th>
+              <th>Decision</th>
+            </tr>
+          </thead>
+          <tbody id="history"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="panel events-panel">
+      <div class="panel-head">
+        <h2>Loop Events</h2>
+        <span id="event-count">0 events</span>
+      </div>
+      <div id="events" class="event-list"></div>
+    </section>
+  </main>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>

@@ -16,3 +16,30 @@ roles:
       - crm_get_support_history
       - email_send
       - followup_schedule
+      - manager_approval_request
+      - approval_get_status
+      - discount_create
+      - finance_case_open
+      - memory_read
+      - memory_write
+      - attachment_read
+      - web_fetch
+      - crm_note_append
+  support_manager:
+    tools:
+      - manager_approval_request
+      - approval_get_status
+      - bulk_refund_create
+      - discount_create
+  finance:
+    tools:
+      - approval_get_status
+      - bulk_refund_create
+      - finance_case_open
+  fraud_analyst:
+    tools:
+      - fraud_record_get
+      - finance_case_open
+  connector_service:
+    tools:
+      - third_party_mcp_call

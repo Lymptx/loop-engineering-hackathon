@@ -19,3 +19,23 @@ operators:
       same_tenant_required: bool
       redact_data_classes: list
       allow_data_classes: list
+
+  - id: approval_provenance_policy
+    control_layer: approval_policy
+    description: >
+      Require manager approval records to come from the approval tool, bind them
+      to a specific purpose, and enforce aggregate refund limits.
+    params:
+      require_tool_issued_approval: bool
+      aggregate_cap: number
+      allowed_roles: list
+
+  - id: memory_connector_policy
+    control_layer: memory_policy
+    description: >
+      Quarantine untrusted memory and connector output, require provenance labels,
+      and prevent attachments/webpages from becoming instructions.
+    params:
+      quarantine_untrusted_sources: bool
+      require_provenance_labels: bool
+      connector_allowlist: list

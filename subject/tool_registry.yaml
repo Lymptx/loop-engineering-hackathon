@@ -51,3 +51,67 @@ tools:
     reads: [ticket_state]
     produces: [ticket_state]
     sink: scheduler
+
+  # --- Evo2: finance + fraud + approval ---
+  manager_approval_request:
+    generation: evo2
+    reads: [refund_amount, refund_budget]
+    produces: [manager_approval_record]
+    sink: approval_queue
+  approval_get_status:
+    generation: evo2
+    reads: [manager_approval_record]
+    produces: [manager_approval_record]
+    sink: null
+  bulk_refund_create:
+    generation: evo2
+    reads: [refund_amount, refund_budget, manager_approval_record]
+    produces: [refund_amount]
+    sink: finance_refund_ledger
+  fraud_record_get:
+    generation: evo2
+    reads: [fraud_risk_score, chargeback_history]
+    produces: [fraud_risk_score, chargeback_history]
+    sink: null
+  discount_create:
+    generation: evo2
+    reads: [discount_limits]
+    produces: [discount_limits]
+    sink: billing_discount_store
+  finance_case_open:
+    generation: evo2
+    reads: [finance_notes, refund_budget]
+    produces: [finance_notes]
+    sink: finance_case_system
+
+  # --- Evo3: memory + attachments + third-party connectors ---
+  memory_read:
+    generation: evo3
+    reads: [persistent_memory]
+    produces: [persistent_memory]
+    sink: null
+  memory_write:
+    generation: evo3
+    reads: [untrusted_customer_ticket, persistent_memory]
+    produces: [persistent_memory]
+    sink: long_term_memory
+  attachment_read:
+    generation: evo3
+    reads: [uploaded_attachment]
+    produces: [uploaded_attachment]
+    sink: null
+  web_fetch:
+    generation: evo3
+    reads: [external_webpage]
+    produces: [third_party_tool_output]
+    sink: null
+  crm_note_append:
+    generation: evo3
+    reads: [crm_notes, third_party_tool_output]
+    produces: [crm_notes]
+    sink: crm_notes_store
+  third_party_mcp_call:
+    generation: evo3
+    reads: [connector_metadata, third_party_tool_output]
+    produces: [third_party_tool_output]
+    sink: third_party_connector
