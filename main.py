@@ -181,6 +181,13 @@ def cmd_evo(_args) -> None:
     print(f"    Defender versions:   {defs}")
 
 
+def cmd_cockpit(args) -> None:
+    """Start the live co-evolution cockpit (deterministic, local). Open the printed URL."""
+    from cockpit.server import serve
+
+    serve(port=args.port, pace=args.pace)
+
+
 def _print_metrics_table(before: dict, after: dict, v1: str, v2: str) -> None:
     rows = [
         ("Hidden attack success",
@@ -231,6 +238,11 @@ def main() -> None:
     sub.add_parser("reset").set_defaults(func=cmd_reset)
     sub.add_parser("demo").set_defaults(func=cmd_demo)
     sub.add_parser("evo").set_defaults(func=cmd_evo)
+
+    p_cockpit = sub.add_parser("cockpit")
+    p_cockpit.add_argument("--port", type=int, default=8000)
+    p_cockpit.add_argument("--pace", type=float, default=0.35)
+    p_cockpit.set_defaults(func=cmd_cockpit)
 
     args = parser.parse_args()
     args.func(args)

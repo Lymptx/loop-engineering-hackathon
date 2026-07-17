@@ -1,0 +1,209 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Agent Immune CI — Live Co-Evolution Cockpit</title>
+<style>
+  :root {
+    --bg: #0d1117; --panel: #161b22; --border: #30363d; --fg: #e6edf3;
+    --muted: #8b949e; --ok: #3fb950; --bad: #f85149; --warn: #d29922; --accent: #58a6ff;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--fg);
+    font: 13px/1.45 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+  h1 { font-size: 15px; margin: 0; }
+  .bar { display: flex; align-items: center; gap: 16px; padding: 10px 16px;
+    background: var(--panel); border-bottom: 1px solid var(--border); flex-wrap: wrap; }
+  .bar .stat { display: flex; flex-direction: column; }
+  .bar .stat b { color: var(--muted); font-weight: 600; font-size: 11px; text-transform: uppercase; }
+  .bar .spacer { flex: 1; }
+  button { background: var(--accent); color: #0d1117; border: 0; border-radius: 6px;
+    padding: 8px 14px; font: inherit; font-weight: 700; cursor: pointer; }
+  button.ghost { background: transparent; color: var(--fg); border: 1px solid var(--border); }
+  button:disabled { opacity: .5; cursor: default; }
+  .grid { display: grid; grid-template-columns: 1.1fr 1.2fr .9fr; gap: 10px; padding: 10px;
+    height: calc(100vh - 58px - 200px); }
+  .panel { background: var(--panel); border: 1px solid var(--border); border-radius: 8px;
+    display: flex; flex-direction: column; overflow: hidden; }
+  .panel > h2 { font-size: 11px; text-transform: uppercase; color: var(--muted);
+    margin: 0; padding: 8px 12px; border-bottom: 1px solid var(--border); letter-spacing: .04em; }
+  .panel > .body { overflow-y: auto; padding: 8px 10px; }
+  .row { padding: 6px 8px; border: 1px solid var(--border); border-radius: 6px; margin-bottom: 6px;
+    background: #0d1117; }
+  .row .top { display: flex; justify-content: space-between; gap: 8px; }
+  .tag { font-size: 11px; padding: 1px 6px; border-radius: 10px; border: 1px solid var(--border); }
+  .ok { color: var(--ok); border-color: var(--ok); } .bad { color: var(--bad); border-color: var(--bad); }
+  .warn { color: var(--warn); border-color: var(--warn); }
+  .muted { color: var(--muted); } .path { color: var(--accent); word-break: break-all; }
+  .bottom { padding: 0 10px 10px; height: 200px; display: grid; grid-template-columns: 2fr 1fr; gap: 10px; }
+  table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  th, td { text-align: left; padding: 4px 6px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+  th { color: var(--muted); font-weight: 600; position: sticky; top: 0; background: var(--panel); }
+  .metric { display: flex; justify-content: space-between; padding: 3px 0; border-bottom: 1px dashed var(--border); }
+  code { color: var(--warn); }
+  .phase { color: var(--accent); }
+</style>
+</head>
+<body>
+  <div class="bar">
+    <h1>🧬 Agent Immune CI — Co-Evolution Cockpit</h1>
+    <div class="stat"><b>Evo</b><span id="s-evo">—</span></div>
+    <div class="stat"><b>Active Defender</b><span id="s-def">—</span></div>
+    <div class="stat"><b>Phase</b><span id="s-phase" class="phase">idle</span></div>
+    <div class="stat"><b>Status</b><span id="s-status">idle</span></div>
+    <div class="stat"><b>Latest</b><span id="s-latest" class="muted">—</span></div>
+    <div class="spacer"></div>
+    <button id="start">▶ Start Demo</button>
+    <button id="reset" class="ghost">Reset</button>
+  </div>
+
+  <div class="grid">
+    <div class="panel">
+      <h2>Live attack stream</h2>
+      <div class="body" id="attacks"></div>
+    </div>
+    <div class="panel">
+      <h2>Protected subject trace (latest attempt)</h2>
+      <div class="body" id="trace"><div class="muted">No attempts yet.</div></div>
+    </div>
+    <div class="panel">
+      <h2>Bundles</h2>
+      <div class="body">
+        <div class="muted">Attacker bundle (<span id="atk-count">0</span>)</div>
+        <div id="atk-bundles"></div>
+        <div class="muted" style="margin-top:8px">Defender bundle (<span id="def-count">0</span>)</div>
+        <div id="def-bundles"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="bottom">
+    <div class="panel">
+      <h2>Generation history</h2>
+      <div class="body">
+        <table id="history">
+          <thead><tr><th>defender</th><th>family</th><th>frontier</th><th>hidden</th>
+            <th>benign</th><th>policy diff</th><th>decision</th><th>reason</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+    <div class="panel">
+      <h2>Metrics (latest)</h2>
+      <div class="body" id="metrics"><div class="muted">—</div></div>
+    </div>
+  </div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+let lastSeq = 0;
+
+async function jget(u) { const r = await fetch(u); return r.json(); }
+async function jpost(u) { const r = await fetch(u, {method: "POST"}); return r.json(); }
+
+function verdictTag(success) {
+  return success ? '<span class="tag bad">SUCCESS</span>'
+                 : '<span class="tag ok">blocked</span>';
+}
+
+function renderAttacks(attempts) {
+  $("attacks").innerHTML = attempts.slice().reverse().map(a => `
+    <div class="row">
+      <div class="top"><b>${a.family}</b>${verdictTag(a.success)}</div>
+      <div class="muted">${a.objective}</div>
+      <div class="path">${a.target_path}</div>
+      <div class="muted">defender: ${a.defender_version}
+        ${a.violated_invariant ? '· invariant: <code>'+a.violated_invariant+'</code>' : ''}</div>
+    </div>`).join("");
+  if (attempts.length) renderTrace(attempts[attempts.length - 1]);
+}
+
+function renderTrace(a) {
+  const t = a.trace || {};
+  const calls = (t.tool_calls || []).map(c =>
+    `<div class="row"><span>${c.name}</span> ${c.denied ? '<span class="tag bad">403</span>' : '<span class="tag ok">ok</span>'}</div>`
+  ).join("");
+  $("trace").innerHTML = `
+    <div class="muted">carrier</div><div class="row">${t.carrier || ''}</div>
+    <div class="muted">tool calls</div>${calls || '<div class="muted">none</div>'}
+    <div class="muted">policy decision</div><div class="row">${t.policy_decision || ''}</div>
+    <div class="muted">verifier observation</div>
+    <div class="row">${JSON.stringify(t.verifier_observation || {})}</div>`;
+}
+
+function renderBundles(atk, def) {
+  $("atk-count").textContent = atk.length;
+  $("def-count").textContent = def.length;
+  $("atk-bundles").innerHTML = atk.map(b => `
+    <div class="row"><div class="top"><b>${b.family}</b>
+      ${b.latest_success === true ? '<span class="tag bad">succeeded</span>' :
+        b.latest_success === false ? '<span class="tag ok">blocked</span>' :
+        '<span class="tag muted">untested</span>'}</div>
+      <div class="muted">${b.objective}</div></div>`).join("");
+  $("def-bundles").innerHTML = def.map(b => `
+    <div class="row"><div class="top"><b>${b.defender_version}</b>
+      <span class="tag ${b.promotion_decision === 'promoted' ? 'ok' : 'muted'}">${b.promotion_decision}</span></div>
+      <div class="muted">${b.policy_diff_summary}</div></div>`).join("");
+}
+
+function renderHistory(rows) {
+  $("history").querySelector("tbody").innerHTML = rows.map(r => {
+    const d = r.promotion_decision;
+    const cls = d === 'promoted' ? 'ok' : d === 'rejected' ? 'bad' : 'warn';
+    return `<tr><td>${r.defender_version}</td><td>${r.attack_family}</td>
+      <td>${r.frontier_attack_success}</td><td>${r.hidden_attack_success}</td>
+      <td>${r.benign_success}</td><td class="muted">${r.policy_diff_summary}</td>
+      <td><span class="tag ${cls}">${d}</span></td><td class="muted">${r.reason}</td></tr>`;
+  }).join("");
+}
+
+function renderMetrics(metrics) {
+  if (!metrics.length) return;
+  const m = metrics[metrics.length - 1];
+  const fam = Object.entries(m.attack_success_rate_by_family || {})
+    .map(([k, v]) => `<div class="metric"><span class="muted">&nbsp;&nbsp;${k}</span><span>${v}</span></div>`).join("");
+  $("metrics").innerHTML = `
+    <div class="metric"><span>attack success rate</span><b>${m.attack_success_rate}</b></div>
+    ${fam}
+    <div class="metric"><span>benign success rate</span><b>${m.benign_success_rate}</b></div>
+    <div class="metric"><span>hidden holdout success</span><b>${m.hidden_holdout_attack_success}</b></div>
+    <div class="metric"><span>blocked attacks</span><b>${m.blocked_attack_count}</b></div>
+    <div class="metric"><span>new attack families</span><b>${m.new_attack_family_count}</b></div>`;
+}
+
+async function poll() {
+  try {
+    const st = await jget("/api/demo/state");
+    $("s-evo").textContent = st.current_evo;
+    $("s-def").textContent = st.active_defender || "—";
+    $("s-phase").textContent = st.current_phase;
+    $("s-status").textContent = st.status;
+    $("start").disabled = st.status === "running";
+
+    const events = await jget("/api/demo/events?since=" + lastSeq);
+    if (events.length) { lastSeq = events[events.length - 1].sequence;
+      $("s-latest").textContent = events[events.length - 1].summary; }
+
+    const [attempts, atk, def, hist, metrics] = await Promise.all([
+      jget("/api/demo/attempts"), jget("/api/demo/attacker-bundles"),
+      jget("/api/demo/defender-bundles"), jget("/api/demo/generation-history"),
+      jget("/api/demo/metrics"),
+    ]);
+    renderAttacks(attempts);
+    renderBundles(atk, def);
+    renderHistory(hist);
+    renderMetrics(metrics);
+  } catch (e) { /* server momentarily busy; keep polling */ }
+}
+
+$("start").onclick = async () => { $("start").disabled = true; await jpost("/api/demo/start"); };
+$("reset").onclick = async () => { await jpost("/api/demo/reset"); lastSeq = 0;
+  $("attacks").innerHTML = ""; $("trace").innerHTML = '<div class="muted">No attempts yet.</div>';
+  $("history").querySelector("tbody").innerHTML = ""; $("metrics").innerHTML = '<div class="muted">—</div>'; };
+
+poll();
+setInterval(poll, 500);
+</script>
+</body>
+</html>

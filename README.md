@@ -99,6 +99,37 @@ Documented MVP boundaries of the simulator: only `routes[0]` is evaluated; an ab
 
 ---
 
+## Live cockpit (one command, one URL)
+
+```bash
+make cockpit          # or: python main.py cockpit  [--port 8000] [--pace 0.35]
+# -> open http://127.0.0.1:8000  and press "Start Demo"
+```
+
+The cockpit ([`cockpit/`](./cockpit)) is a local, deterministic, judge-visible view of
+the Evo0 → Evo1 co-evolution loop. Pressing **Start Demo** runs the real backend loop
+in a thread; the page polls JSON APIs and renders **only persisted records** — no faked
+animation. Panels ↔ backing records:
+
+| Panel | Backed by |
+|---|---|
+| Top status bar (evo / defender / phase / status / latest event) | `LoopRun` + latest `LoopEvent` (`/state`, `/events`) |
+| Left — live attack stream | `AttackAttempt` records (`/attempts`) — family, objective, target path, defender, success, invariant |
+| Center — protected subject trace | the latest `AttackAttempt.trace` (carrier, tool calls, policy decision, verifier observation) |
+| Right — attacker / defender bundles | `AttackBundleEntry` / `DefenderBundleEntry` (`/attacker-bundles`, `/defender-bundles`) |
+| Bottom — generation history | `GenerationHistoryRow` (`/generation-history`) |
+| Bottom — metrics | `MetricSnapshot` (`/metrics`), computed from stored attempts |
+
+Everything is persisted to `storage/data/cockpit.json`, so **a server restart reloads
+prior run history**; only `POST /api/demo/reset` (the Reset button) clears it, and it
+never deletes the immutable capability/defender version artifacts.
+
+A run streams ≥8 attack attempts: Evo0 families (blocked by the baseline defender),
+then the new Evo1 `crm_email_exfiltration` succeeding against **def-v1**, candidate A
+(deny-all-email) **rejected** for benign regression, candidate B (verified-recipient +
+same-tenant + redaction) **promoted** as **def-v2**, then the exfiltration replayed and
+**blocked** — attack-success drops, benign stays 1.0, and both bundle lists grow.
+
 ## Evolving subject (Evo0 → Evo1)
 
 Beyond the static refund/admin demo, the target is modeled as an **evolving benchmark

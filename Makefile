@@ -1,7 +1,7 @@
 # Convenience targets. On Windows without `make`, use the `python main.py ...`
 # commands directly (see README).
 
-.PHONY: install test demo evo matrix reset status
+.PHONY: install test demo evo cockpit matrix reset status
 
 install:
 	python -m pip install -r requirements.txt
@@ -10,7 +10,11 @@ install:
 test:
 	DEMO_MODE=deterministic python -m pytest -q
 
-# The Evo0 golden demo: reproducible, no API key, no external services.
+# Live co-evolution cockpit: one command, one URL, press Start Demo.
+cockpit:
+	python main.py cockpit
+
+# The Evo0 golden demo (CLI): reproducible, no API key, no external services.
 demo:
 	python main.py demo
 
