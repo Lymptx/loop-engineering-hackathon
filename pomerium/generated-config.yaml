@@ -26,4 +26,22 @@ routes:
       - mcp_tool:
           is: issue_refund
       - mcp_tool:
+          is: issue_refund_low_value
+      - mcp_tool:
+          is: issue_refund_high_value
+      - mcp_tool:
           is: internal_diagnostics
+      - mcp_tool:
+          is: export_customer_data
+      - mcp_tool:
+          is: export_customer_segment
+      - mcp_tool:
+          is: send_customer_email
+      - mcp_tool:
+          is: update_shipping_address
+      - mcp_tool:
+          is: cancel_order
+      - mcp_tool:
+          is: close_account
+      - mcp_tool:
+          is: change_risk_score

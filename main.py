@@ -18,9 +18,13 @@ from dotenv import load_dotenv
 
 from loop import orchestrator
 from loop.models import DefenderVersion
-from storage import db
+from storage import get_active_store
 
 load_dotenv()
+
+# Pick the persistence backend AFTER load_dotenv() so STORAGE_BACKEND from .env is
+# honoured: "json" (local, default) or "dynamodb" (DynamoDB + S3). Same interface.
+db = get_active_store()
 
 
 def _get_or_seed_defender() -> DefenderVersion:
