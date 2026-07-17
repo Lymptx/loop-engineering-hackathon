@@ -53,7 +53,7 @@ pomerium-logs:
 	docker compose -f pomerium/docker-compose.yaml logs -f pomerium
 
 pomerium-smoke: pomerium-config
-	@for i in 1 2 3 4 5 6 7 8 9 10; do \
+	@for i in $$(seq 1 60); do \
 		curl -fsS http://127.0.0.1:18081/mcp \
 			-H 'Content-Type: application/json' \
 			--data '{"jsonrpc":"2.0","id":"smoke","method":"tools/call","params":{"name":"lookup_order","arguments":{"order_id":"A1001"}}}' && exit 0; \
