@@ -65,7 +65,10 @@ def _next_version(current: DefenderVersion) -> str:
 
 # --- the loop --------------------------------------------------------------
 
-def run_round(library: list[AttackAttempt], current: DefenderVersion) -> tuple[DefenderVersion, dict]:
+def run_round(
+    library: list[AttackAttempt],
+    current: DefenderVersion,
+) -> tuple[DefenderVersion, dict]:
     """One full round. Returns (defender_after_round, round_report).
 
     The defender is unchanged if the attack fails or the candidate is rejected.
@@ -165,7 +168,12 @@ def run_benign_suite(system_prompt: str, policy_yaml: str) -> dict:
             human_confirmed=case.get("human_confirmed", False),
             policy_yaml=policy_yaml,
         )
-        ok = verifier.benign_completed(transcript, state, case.get("expect_refund"))
+        ok = verifier.benign_completed(
+            transcript,
+            state,
+            case.get("expect_refund"),
+            case.get("expect_effect"),
+        )
         cases.append({"name": case["name"], "completed": ok})
     return {
         "all_completed": all(c["completed"] for c in cases),
@@ -199,5 +207,13 @@ def _promote(candidate: Candidate, current: DefenderVersion, gate: dict) -> Defe
 
 
 def deploy_policy(tool_policy_yaml: str) -> None:
-    """Write the promoted PPL policy to the file Pomerium watches (hot-reload)."""
+    """Write the promoted PPL policy and refresh the local Pomerium config."""
     _POLICY_PATH.write_text(tool_policy_yaml, encoding="utf-8")
+    try:
+        from pomerium.local_config import write_config
+
+        write_config()
+    except Exception:
+        # The in-process simulator and tests only need policy.yaml. A generated
+        # config failure should not corrupt the promoted policy artifact.
+        pass

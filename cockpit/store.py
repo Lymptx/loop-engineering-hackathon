@@ -29,12 +29,18 @@ def _ensure_dirs() -> None:
 def _read(path: Path) -> list[dict]:
     if not path.exists():
         return []
-    return json.loads(path.read_text(encoding="utf-8"))
+    try:
+        raw = path.read_text(encoding="utf-8")
+        return json.loads(raw) if raw.strip() else []
+    except json.JSONDecodeError:
+        return []
 
 
 def _write(path: Path, rows: list[dict]) -> None:
     _ensure_dirs()
-    path.write_text(json.dumps(rows, indent=2), encoding="utf-8")
+    tmp = path.with_suffix(f"{path.suffix}.tmp")
+    tmp.write_text(json.dumps(rows, indent=2), encoding="utf-8")
+    tmp.replace(path)
 
 
 def _append(path: Path, row: dict) -> None:

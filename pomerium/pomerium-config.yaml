@@ -1,4 +1,4 @@
-# Pomerium base config (step 6 — gateway mode). Laptop mode does not need this.
+# Reference Pomerium base config. Local Docker mode uses generated-config.yaml.
 #
 # Pomerium sits as the MCP gateway in front of the tool server. The target agent
 # never talks to the tool server directly — every tools/call request passes
@@ -8,9 +8,12 @@
 # for a single-instance hackathon deployment — avoid the k8s/etcd dynamic-config
 # reload-lag path on demo day).
 
-# The routes live in policy.yaml (loaded via the include below in real Pomerium
-# you'd inline them; kept split so the Blue Agent only ever rewrites policy.yaml).
-authenticate_service_url: https://authenticate.sandbox.internal
+# Generate the runnable local file with:
+#
+#   python -m pomerium.local_config
+#
+# The generated config uses insecure local HTTP on 127.0.0.1:18081 and injects
+# `allow: accept` so agent-to-tool calls can be tested without OIDC.
 
 # For the hackathon we skip a real OIDC IdP. The test harness mints a short-lived
 # signed JWT carrying claims like human_confirmed=false (attacker) / true

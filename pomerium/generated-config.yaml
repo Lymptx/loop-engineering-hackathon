@@ -1,0 +1,21 @@
+address: :18081
+insecure_server: true
+runtime_flags:
+  mcp: true
+log_level: info
+authorize_log_fields:
+- request-id
+- method
+- path
+- mcp-method
+- mcp-tool
+- mcp-tool-parameters
+routes:
+- from: http://127.0.0.1:18081
+  to: http://tool-server:8080
+  mcp:
+    server: {}
+  policy:
+    allow:
+      and:
+      - accept: true

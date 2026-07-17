@@ -22,6 +22,7 @@
       <div><span>Status</span><strong id="run-status">idle</strong></div>
     </div>
     <div class="actions">
+      <button id="target-agent-btn" type="button">Target Agent</button>
       <button id="reset-btn" type="button">Reset</button>
       <button id="start-btn" type="button">Start Demo</button>
     </div>
@@ -101,6 +102,19 @@
       <div id="events" class="event-list"></div>
     </section>
   </main>
+
+  <div id="target-modal" class="modal" hidden>
+    <div class="modal-shell">
+      <div class="modal-head">
+        <div>
+          <h2>Target Agent</h2>
+          <p id="target-agent-subtitle">Current protected subject</p>
+        </div>
+        <button id="target-close-btn" type="button">Close</button>
+      </div>
+      <div id="target-agent-view" class="target-grid"></div>
+    </div>
+  </div>
 
   <script src="/static/app.js"></script>
 </body>

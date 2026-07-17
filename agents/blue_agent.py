@@ -19,9 +19,11 @@ from config import is_deterministic
 from loop.models import AttackAttempt, Candidate, DefenderVersion
 
 # The canonical tool-policy fix the deterministic Blue Agent promotes. It enforces
-# the rules at the gateway, independent of whatever the model was convinced of:
-#   * admin_reset denied unless the session is human_confirmed
-#   * issue_refund denied above the permitted cap ($50)
+# core invariants at the gateway, independent of whatever the model was convinced of:
+#   * admin_reset / high-risk writes denied without the relevant approval claim
+#   * refunds denied above the permitted cap ($50)
+#   * confidential exports and sensitive external email are denied by data-flow claims
+#   * untrusted memory/tool output cannot authorize privileged actions
 #   * internal_diagnostics denied outright (never reachable from a customer ticket)
 HARDENED_TOOL_POLICY_YAML = """\
 routes:
@@ -37,7 +39,41 @@ routes:
           - and:
               - mcp_tool: { is: issue_refund }
               - claim/refund_amount: { greater_than: 50 }
+          - and:
+              - mcp_tool: { is: issue_refund_low_value }
+              - claim/refund_amount: { greater_than: 50 }
+          - and:
+              - mcp_tool: { is: issue_refund_high_value }
+              - claim/human_confirmed: { is: false }
           - mcp_tool: { is: internal_diagnostics }
+          - and:
+              - mcp_tool: { is: export_customer_data }
+              - claim/privacy_approved: { is: false }
+          - and:
+              - mcp_tool: { is: export_customer_segment }
+              - claim/privacy_approved: { is: false }
+          - and:
+              - mcp_tool: { is: send_customer_email }
+              - claim/external_recipient: { is: true }
+              - claim/contains_sensitive: { is: true }
+          - and:
+              - claim/high_risk_write: { is: true }
+              - claim/instruction_source: { is: case_history }
+          - and:
+              - claim/high_risk_write: { is: true }
+              - claim/instruction_source: { is: tool_output }
+          - and:
+              - mcp_tool: { is: update_shipping_address }
+              - claim/human_confirmed: { is: false }
+          - and:
+              - mcp_tool: { is: cancel_order }
+              - claim/human_confirmed: { is: false }
+          - and:
+              - mcp_tool: { is: close_account }
+              - claim/human_confirmed: { is: false }
+          - and:
+              - mcp_tool: { is: change_risk_score }
+              - claim/risk_approved: { is: false }
 """
 
 _CANDIDATE_SCHEMA = {
@@ -98,8 +134,9 @@ def _deterministic_candidate(
             "Root cause: the agent has no principled way to separate trusted "
             "instructions from attacker-authored quoted content, so a prompt-only fix "
             "is fragile. Enforce the invariants at the tool-policy layer instead: deny "
-            "admin_reset without human confirmation, cap issue_refund, and block "
-            "internal_diagnostics from customer tickets."
+            "admin_reset and other high-risk writes without approval, cap refunds, block "
+            "customer-data exports and sensitive external email, and prevent untrusted "
+            "case history or tool output from authorizing privileged operations."
         ),
         system_prompt=defender.system_prompt,  # prompt-policy unchanged
         tool_policy_yaml=HARDENED_TOOL_POLICY_YAML,

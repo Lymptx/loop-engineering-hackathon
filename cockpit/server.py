@@ -11,7 +11,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
-from cockpit import demo, store
+from cockpit import demo, store, subject_view
 
 _STATIC_DIR = Path(__file__).parent / "static"
 _DEMO_THREAD: threading.Thread | None = None
@@ -50,6 +50,9 @@ class CockpitHandler(BaseHTTPRequestHandler):
             return
         if path == "/api/demo/metrics":
             self._send_json({"metrics": store.metrics()})
+            return
+        if path == "/api/demo/target-agent":
+            self._send_json(subject_view.snapshot())
             return
         self._send_json({"error": "not found"}, status=HTTPStatus.NOT_FOUND)
 

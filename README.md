@@ -153,6 +153,21 @@ egress verifier. Evo2/Evo3 currently use deterministic local cockpit traces and
 promotion records over the same persisted loop contract; their specialized
 fraud/approval and memory/connector sandboxes are the next hardening step.
 
+### Runtime Red/Blue Agents
+
+The cockpit includes deterministic runtime agents in `cockpit/autonomy.py`:
+
+- Red scans the active subject capability graph diff, ranks new source-to-sink
+  paths using risk and prior attempt statistics, then emits a new attack bundle.
+- Blue reads the failed invariants from the latest trace, selects the control
+  layer, generates an over-broad candidate and a refined candidate, then relies
+  on the promotion gate outcome to reject or promote.
+
+This is not Claude Code/Codex operating the product. It is app runtime logic with
+a deterministic adapter for demo/test stability. A later LLM adapter can implement
+the same Red/Blue contracts with model calls while keeping the verifier and
+promotion gate deterministic.
+
 ## Layout
 
 ```
