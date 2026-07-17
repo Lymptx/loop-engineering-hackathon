@@ -126,5 +126,7 @@ def test_target_agent_snapshot_tracks_current_evo_and_customer_workspace():
     assert evolved["evo"] == "evo3"
     assert any(tool["name"] == "memory_write" for tool in evolved["tools"])
     assert any(data["sensitivity"] == "restricted" for data in evolved["data_classes"])
-    assert evolved["customer_workspace"]["customers"]
-    assert evolved["customer_workspace"]["orders"]
+    assert len(evolved["customer_workspace"]["customers"]) >= 12
+    assert len(evolved["customer_workspace"]["orders"]) >= 12
+    assert len(evolved["customer_workspace"]["payments"]) >= 12
+    assert len(evolved["customer_workspace"]["tickets"]) >= 12

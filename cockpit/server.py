@@ -66,9 +66,7 @@ class CockpitHandler(BaseHTTPRequestHandler):
         if parsed.path == "/api/demo/start":
             payload = self._read_json()
             pace = float(payload.get("pace_seconds", 0.35))
-            cycles = payload.get("production_cycles")
-            production_cycles = 0 if cycles is None else int(cycles)
-            status = _start_demo_thread(pace, production_cycles)
+            status = _start_demo_thread(pace)
             self._send_json(status)
             return
         self._send_json({"error": "not found"}, status=HTTPStatus.NOT_FOUND)
@@ -109,7 +107,7 @@ class CockpitHandler(BaseHTTPRequestHandler):
         self.wfile.write(body)
 
 
-def _start_demo_thread(pace_seconds: float, production_cycles: int | None) -> dict:
+def _start_demo_thread(pace_seconds: float) -> dict:
     global _DEMO_THREAD, _STOP_EVENT
     with _THREAD_LOCK:
         if _DEMO_THREAD and _DEMO_THREAD.is_alive():
@@ -117,10 +115,8 @@ def _start_demo_thread(pace_seconds: float, production_cycles: int | None) -> di
         _STOP_EVENT = threading.Event()
 
         def target() -> None:
-            demo.run_live_demo(
+            demo.run_next_step(
                 pace_seconds=pace_seconds,
-                reset=True,
-                production_cycles=production_cycles,
                 stop_event=_STOP_EVENT,
             )
 

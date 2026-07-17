@@ -117,7 +117,11 @@ class Handler(BaseHTTPRequestHandler):
             self._send_json({"error": f"bad json: {exc}"}, status=HTTPStatus.BAD_REQUEST)
             return
 
-        response = [handle_rpc(item) for item in payload] if isinstance(payload, list) else handle_rpc(payload)
+        response = (
+            [handle_rpc(item) for item in payload]
+            if isinstance(payload, list)
+            else handle_rpc(payload)
+        )
         self._send_json(response)
 
     def log_message(self, fmt: str, *args) -> None:

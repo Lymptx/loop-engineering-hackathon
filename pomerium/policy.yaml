@@ -2,4 +2,47 @@ routes:
   - from: https://tools.sandbox.internal
     to: http://tool-server:8080
     mcp: true
-    policy: {}   # permissive seed — no deny rules yet
+    policy:
+      deny:
+        or:
+          - and:
+              - mcp_tool: { is: admin_reset }
+              - claim/human_confirmed: { is: false }
+          - and:
+              - mcp_tool: { is: issue_refund }
+              - claim/refund_amount: { greater_than: 50 }
+          - and:
+              - mcp_tool: { is: issue_refund_low_value }
+              - claim/refund_amount: { greater_than: 50 }
+          - and:
+              - mcp_tool: { is: issue_refund_high_value }
+              - claim/human_confirmed: { is: false }
+          - mcp_tool: { is: internal_diagnostics }
+          - and:
+              - mcp_tool: { is: export_customer_data }
+              - claim/privacy_approved: { is: false }
+          - and:
+              - mcp_tool: { is: export_customer_segment }
+              - claim/privacy_approved: { is: false }
+          - and:
+              - mcp_tool: { is: send_customer_email }
+              - claim/external_recipient: { is: true }
+              - claim/contains_sensitive: { is: true }
+          - and:
+              - claim/high_risk_write: { is: true }
+              - claim/instruction_source: { is: case_history }
+          - and:
+              - claim/high_risk_write: { is: true }
+              - claim/instruction_source: { is: tool_output }
+          - and:
+              - mcp_tool: { is: update_shipping_address }
+              - claim/human_confirmed: { is: false }
+          - and:
+              - mcp_tool: { is: cancel_order }
+              - claim/human_confirmed: { is: false }
+          - and:
+              - mcp_tool: { is: close_account }
+              - claim/human_confirmed: { is: false }
+          - and:
+              - mcp_tool: { is: change_risk_score }
+              - claim/risk_approved: { is: false }

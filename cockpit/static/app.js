@@ -1,5 +1,6 @@
 const stateUrl = "/api/demo/state";
 const targetAgentUrl = "/api/demo/target-agent";
+let activeTargetTab = "customers";
 
 const $ = (id) => document.getElementById(id);
 
@@ -42,6 +43,7 @@ function render(state) {
   $("phase").textContent = run.current_phase || "idle";
   $("run-status").textContent = run.status || "idle";
   $("run-subtitle").textContent = run.run_id ? `run ${run.run_id}` : "persistent co-evolution loop";
+  renderStartButton(run);
 
   renderAttempts(state.attempts || []);
   renderTrace(state.traces || []);
@@ -49,6 +51,36 @@ function render(state) {
   renderMetrics(state.latest_metrics || null);
   renderHistory(state.generation_history || []);
   renderEvents(state.events || []);
+}
+
+function nextEvo(evo) {
+  const evos = ["evo0", "evo1", "evo2", "evo3"];
+  const idx = evos.indexOf(evo || "evo0");
+  return idx >= 0 && idx + 1 < evos.length ? evos[idx + 1] : null;
+}
+
+function renderStartButton(run) {
+  const button = $("start-btn");
+  const evo = run.current_evo || "evo0";
+  const phase = run.current_phase || "idle";
+  const status = run.status || "idle";
+
+  button.disabled = status === "running";
+  if (status === "running") {
+    button.textContent = "Running...";
+  } else if (!run.run_id || run.mode !== "staged_manual") {
+    button.textContent = "Start Evo0 Target";
+  } else if (phase === "target_ready") {
+    button.textContent = `Run ${evo.toUpperCase()} Attack Loop`;
+  } else if (phase === "campaign_complete") {
+    const next = nextEvo(evo);
+    button.textContent = next ? `Start ${next.toUpperCase()} Target` : "Finish Demo";
+  } else if (phase === "finished" || status === "finished") {
+    button.textContent = "Demo Complete";
+    button.disabled = true;
+  } else {
+    button.textContent = "Continue";
+  }
 }
 
 function renderAttempts(attempts) {
@@ -166,18 +198,73 @@ function renderTargetAgent(data) {
   $("target-agent-subtitle").textContent =
     `${data.evo} · ${data.active_defender} · ${data.summary}`;
   const workspace = data.customer_workspace || {};
-  $("target-agent-view").innerHTML = [
-    renderTargetSummary(data),
-    renderToolSurface(data.tools || []),
-    renderDataClasses(data.data_classes || []),
-    renderCustomers(workspace.customers || []),
-    renderOrders(workspace.orders || []),
-    renderPayments(workspace.payments || []),
-    renderTickets(workspace.tickets || []),
-    renderKnowledge(workspace.knowledge || {}, workspace.protected_internal_values || {}),
-    renderInvariants(data.active_invariants || []),
-    renderWorkflows(data.benign_workflows || []),
-  ].join("");
+  const sections = [
+    ["customers", "Customer Records", `${(workspace.customers || []).length} rows`,
+      renderCustomers(workspace.customers || [])],
+    ["orders", "Orders", `${(workspace.orders || []).length} rows`,
+      renderOrders(workspace.orders || [])],
+    ["payments", "Payment Profiles", `${(workspace.payments || []).length} rows`,
+      renderPayments(workspace.payments || [])],
+    ["tickets", "Support Tickets", `${(workspace.tickets || []).length} rows`,
+      renderTickets(workspace.tickets || [])],
+    ["memory", "Case Memory", `${(workspace.case_notes || []).length} notes`,
+      renderCaseNotes(workspace.case_notes || [])],
+    ["tools", "Tool Surface", `${(data.tools || []).length} tools`,
+      renderToolSurface(data.tools || [])],
+    ["data", "Visible Data Classes", `${(data.data_classes || []).length} classes`,
+      renderDataClasses(data.data_classes || [])],
+    ["knowledge", "Knowledge", "kb · runbooks · secrets",
+      renderKnowledge(workspace.knowledge || {}, workspace.protected_internal_values || {})],
+    ["invariants", "Security Invariants", `${(data.active_invariants || []).length} invariants`,
+      renderInvariants(data.active_invariants || [])],
+    ["workflows", "Benign Workflows", `${(data.benign_workflows || []).length} workflows`,
+      renderWorkflows(data.benign_workflows || [])],
+  ];
+  const sectionIds = sections.map(([id]) => id);
+  if (!sectionIds.includes(activeTargetTab)) {
+    activeTargetTab = sectionIds[0] || "customers";
+  }
+
+  $("target-agent-view").innerHTML = `
+    ${renderTargetSummary(data)}
+    <div class="target-browser">
+      <nav class="target-nav" aria-label="Target agent sections">
+        ${sections.map(([id, title, count], index) => `
+          <button class="${id === activeTargetTab ? "active" : ""}" type="button" data-target-tab="${id}">
+            <span>${escapeHtml(title)}</span>
+            <small>${escapeHtml(count)}</small>
+          </button>
+        `).join("")}
+      </nav>
+      <div class="target-detail">
+        ${sections.map(([id, title, count, body], index) => `
+          <section class="target-pane ${id === activeTargetTab ? "active" : ""}" data-target-pane="${id}">
+            <div class="target-pane-head">
+              <h3>${escapeHtml(title)}</h3>
+              <span>${escapeHtml(count)}</span>
+            </div>
+            ${body}
+          </section>
+        `).join("")}
+      </div>
+    </div>
+  `;
+  bindTargetTabs();
+}
+
+function bindTargetTabs() {
+  const buttons = Array.from(document.querySelectorAll("[data-target-tab]"));
+  const panes = Array.from(document.querySelectorAll("[data-target-pane]"));
+  buttons.forEach((button) => {
+    button.addEventListener("click", () => {
+      const target = button.dataset.targetTab;
+      activeTargetTab = target;
+      buttons.forEach((b) => b.classList.toggle("active", b === button));
+      panes.forEach((pane) => {
+        pane.classList.toggle("active", pane.dataset.targetPane === target);
+      });
+    });
+  });
 }
 
 function renderTargetSummary(data) {
@@ -189,7 +276,7 @@ function renderTargetSummary(data) {
     ["Benign workflows", (data.benign_workflows || []).length],
   ];
   return `
-    <section class="target-section wide">
+    <section class="target-summary">
       <div class="target-section-head">
         <h3>Current Subject Snapshot</h3>
         <span>${escapeHtml(data.evo)} protected by ${escapeHtml(data.active_defender)}</span>
@@ -208,103 +295,93 @@ function renderTargetSummary(data) {
 
 function renderToolSurface(tools) {
   return `
-    <section class="target-section">
-      <div class="target-section-head">
-        <h3>Tool Surface</h3>
-        <span>${tools.length} tools</span>
-      </div>
-      <div class="target-list">
-        ${tools.map((tool) => `
-          <article class="target-row">
-            <div class="target-row-title">
-              <span>${escapeHtml(tool.name)}</span>
-              <span class="risk-${escapeHtml(tool.risk)}">${escapeHtml(tool.risk)}</span>
-            </div>
-            <div class="meta">
-              ${escapeHtml(tool.generation)} · sink ${escapeHtml(tool.sink || "none")}
-            </div>
-            <div class="tag-row">
-              ${(tool.reads || []).map((d) => `
-                <span class="tag">reads ${escapeHtml(d.name)}:${escapeHtml(d.sensitivity)}</span>
-              `).join("")}
-              ${(tool.produces || []).map((d) => `
-                <span class="tag">produces ${escapeHtml(d.name)}:${escapeHtml(d.sensitivity)}</span>
-              `).join("")}
-            </div>
-          </article>
-        `).join("")}
-      </div>
-    </section>
+    <div class="target-list target-list-tools">
+      ${tools.map((tool) => `
+        <article class="target-row">
+          <div class="target-row-title">
+            <span>${escapeHtml(tool.name)}</span>
+            <span class="risk-pill risk-${escapeHtml(tool.risk)}">${escapeHtml(tool.risk)}</span>
+          </div>
+          <div class="meta">
+            ${escapeHtml(tool.generation)} · sink ${escapeHtml(tool.sink || "none")}
+          </div>
+          <div class="tag-row">
+            ${(tool.reads || []).map((d) => `
+              <span class="tag">read ${escapeHtml(d.name)} · ${escapeHtml(d.sensitivity)}</span>
+            `).join("")}
+            ${(tool.produces || []).map((d) => `
+              <span class="tag">write ${escapeHtml(d.name)} · ${escapeHtml(d.sensitivity)}</span>
+            `).join("")}
+          </div>
+        </article>
+      `).join("")}
+    </div>
   `;
 }
 
 function renderDataClasses(rows) {
   return `
-    <section class="target-section">
-      <div class="target-section-head">
-        <h3>Visible Data Classes</h3>
-        <span>${rows.length} classes</span>
-      </div>
-      <div class="target-list">
-        ${rows.map((row) => `
-          <article class="target-row">
-            <div class="target-row-title">
-              <span>${escapeHtml(row.name)}</span>
-              <span>${escapeHtml(row.sensitivity)}</span>
-            </div>
-            <div class="meta">
-              ${escapeHtml(row.generation)} · tenant scoped ${escapeHtml(row.tenant_scoped)}
-            </div>
-          </article>
-        `).join("")}
-      </div>
-    </section>
+    <div class="target-list target-list-compact">
+      ${rows.map((row) => `
+        <article class="target-row compact">
+          <div class="target-row-title">
+            <span>${escapeHtml(row.name)}</span>
+            <span class="sensitivity-${escapeHtml(row.sensitivity)}">${escapeHtml(row.sensitivity)}</span>
+          </div>
+          <div class="meta">
+            ${escapeHtml(row.generation)} · tenant scoped ${escapeHtml(row.tenant_scoped)}
+          </div>
+        </article>
+      `).join("")}
+    </div>
   `;
 }
 
 function renderCustomers(customers) {
-  return renderRecordSection("Customer Records", customers, ["customer_id", "name", "email",
+  return renderRecordSection(customers, ["customer_id", "name", "email",
     "phone", "shipping_address", "segment", "risk_score", "account_status", "internal_note"]);
 }
 
 function renderOrders(orders) {
-  return renderRecordSection("Orders", orders, ["order_id", "customer_id", "customer",
+  return renderRecordSection(orders, ["order_id", "customer_id", "customer",
     "amount", "status", "sku", "shipping_address", "note"]);
 }
 
 function renderPayments(payments) {
-  return renderRecordSection("Payment Profiles", payments, ["customer_id", "last4",
+  return renderRecordSection(payments, ["customer_id", "last4",
     "billing_zip", "chargeback_count", "lifetime_value"]);
 }
 
 function renderTickets(tickets) {
-  return renderRecordSection("Support Tickets", tickets, ["ticket_id", "customer_id",
+  return renderRecordSection(tickets, ["ticket_id", "customer_id",
     "subject", "body", "private_note"]);
 }
 
-function renderRecordSection(title, rows, keys) {
+function renderCaseNotes(notes) {
+  return renderRecordSection(notes, ["id", "customer_id", "content", "source_type",
+    "source_identity", "trust_level", "authorization_eligible", "created_in_session"]);
+}
+
+function renderRecordSection(rows, keys) {
   return `
-    <section class="target-section">
-      <div class="target-section-head">
-        <h3>${escapeHtml(title)}</h3>
-        <span>${rows.length} rows</span>
-      </div>
-      <div class="target-list">
-        ${rows.map((row) => `
-          <article class="target-row">
-            <div class="target-row-title">
-              <span>${escapeHtml(row[keys[0]] || title)}</span>
-              <span>${escapeHtml(row[keys[1]] || "")}</span>
-            </div>
-            <div class="tag-row">
-              ${keys.slice(2).map((key) => `
-                <span class="tag">${escapeHtml(key)}=${escapeHtml(row[key])}</span>
-              `).join("")}
-            </div>
-          </article>
-        `).join("")}
-      </div>
-    </section>
+    <div class="target-list target-list-records">
+      ${rows.map((row) => `
+        <article class="target-row">
+          <div class="target-row-title">
+            <span>${escapeHtml(row[keys[0]] || "record")}</span>
+            <span>${escapeHtml(row[keys[1]] || "")}</span>
+          </div>
+          <dl class="record-fields">
+            ${keys.slice(2).map((key) => `
+              <div>
+                <dt>${escapeHtml(key)}</dt>
+                <dd>${escapeHtml(row[key])}</dd>
+              </div>
+            `).join("")}
+          </dl>
+        </article>
+      `).join("")}
+    </div>
   `;
 }
 
@@ -313,17 +390,11 @@ function renderKnowledge(knowledge, protectedValues) {
   const runbooks = Object.entries(knowledge.runbooks || {});
   const protectedRows = Object.entries(protectedValues || {});
   return `
-    <section class="target-section">
-      <div class="target-section-head">
-        <h3>Knowledge And Internal Values</h3>
-        <span>${kb.length + runbooks.length + protectedRows.length} entries</span>
-      </div>
-      <div class="target-list">
-        ${kb.map(([key, value]) => renderKeyValue("kb", key, value)).join("")}
-        ${runbooks.map(([key, value]) => renderKeyValue("runbook", key, value)).join("")}
-        ${protectedRows.map(([key, value]) => renderKeyValue("protected", key, value)).join("")}
-      </div>
-    </section>
+    <div class="target-list target-list-compact">
+      ${kb.map(([key, value]) => renderKeyValue("kb", key, value)).join("")}
+      ${runbooks.map(([key, value]) => renderKeyValue("runbook", key, value)).join("")}
+      ${protectedRows.map(([key, value]) => renderKeyValue("protected", key, value)).join("")}
+    </div>
   `;
 }
 
@@ -341,57 +412,45 @@ function renderKeyValue(type, key, value) {
 
 function renderInvariants(rows) {
   return `
-    <section class="target-section">
-      <div class="target-section-head">
-        <h3>Active Security Invariants</h3>
-        <span>${rows.length} invariants</span>
-      </div>
-      <div class="target-list">
-        ${rows.map((row) => `
-          <article class="target-row">
-            <div class="target-row-title">
-              <span>${escapeHtml(row.id)}</span>
-              <span>${escapeHtml(row.generation)}</span>
-            </div>
-            <div class="meta">
-              sink ${escapeHtml(row.sink || "none")} · params ${escapeHtml(JSON.stringify(row.params))}
-            </div>
-            <div class="tag-row">
-              ${(row.restricted_data_classes || []).map((name) => `
-                <span class="tag">${escapeHtml(name)}</span>
-              `).join("")}
-            </div>
-          </article>
-        `).join("")}
-      </div>
-    </section>
+    <div class="target-list target-list-compact">
+      ${rows.map((row) => `
+        <article class="target-row">
+          <div class="target-row-title">
+            <span>${escapeHtml(row.id)}</span>
+            <span>${escapeHtml(row.generation)}</span>
+          </div>
+          <div class="meta">
+            sink ${escapeHtml(row.sink || "none")} · params ${escapeHtml(JSON.stringify(row.params))}
+          </div>
+          <div class="tag-row">
+            ${(row.restricted_data_classes || []).map((name) => `
+              <span class="tag">${escapeHtml(name)}</span>
+            `).join("")}
+          </div>
+        </article>
+      `).join("")}
+    </div>
   `;
 }
 
 function renderWorkflows(rows) {
   return `
-    <section class="target-section">
-      <div class="target-section-head">
-        <h3>Benign Workflows</h3>
-        <span>${rows.length} workflows</span>
-      </div>
-      <div class="target-list">
-        ${rows.map((row) => `
-          <article class="target-row">
-            <div class="target-row-title">
-              <span>${escapeHtml(row.workflow_id)}</span>
-              <span>${escapeHtml(row.actor_role)}</span>
-            </div>
-            <div class="meta">${escapeHtml(row.user_goal)}</div>
-            <div class="tag-row">
-              ${(row.required_tools || []).map((tool) => `
-                <span class="tag">${escapeHtml(tool)}</span>
-              `).join("")}
-            </div>
-          </article>
-        `).join("")}
-      </div>
-    </section>
+    <div class="target-list target-list-compact">
+      ${rows.map((row) => `
+        <article class="target-row">
+          <div class="target-row-title">
+            <span>${escapeHtml(row.workflow_id)}</span>
+            <span>${escapeHtml(row.actor_role)}</span>
+          </div>
+          <div class="meta">${escapeHtml(row.user_goal)}</div>
+          <div class="tag-row">
+            ${(row.required_tools || []).map((tool) => `
+              <span class="tag">${escapeHtml(tool)}</span>
+            `).join("")}
+          </div>
+        </article>
+      `).join("")}
+    </div>
   `;
 }
 
@@ -405,13 +464,15 @@ function closeTargetModal() {
 
 async function refresh() {
   render(await fetchState());
+  if (!$("target-modal").hidden) {
+    renderTargetAgent(await fetchTargetAgent());
+  }
 }
 
 $("start-btn").addEventListener("click", async () => {
   $("start-btn").disabled = true;
   await postJson("/api/demo/start", { pace_seconds: 0.04 });
   await refresh();
-  setTimeout(() => { $("start-btn").disabled = false; }, 1200);
 });
 
 $("reset-btn").addEventListener("click", async () => {
