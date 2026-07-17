@@ -1,35 +1,5 @@
-# LIVE Pomerium MCP policy (Pomerium Policy Language / PPL).
-#
-# This is the tool-policy asset the Blue Agent edits. It is hot-reloaded by
-# Pomerium (or read directly by pomerium/ppl.py in laptop mode) on every change.
-# orchestrator.deploy_policy() overwrites this file on a promotion.
-#
-# SEED (DefenderVersion v1): permissive. There are no deny rules yet, so every
-# tool call is allowed — which is exactly why the seed defender is vulnerable.
-# A promoted tool-policy fix adds a `deny` block like the one shown (commented)
-# below: deny always overrides allow, so a matching deny returns 403 regardless
-# of what the target agent was convinced of.
-#
-# The `mcp_tool` criterion is the load-bearing piece — it matches on the tool
-# name inside a tools/call request, giving per-tool granularity.
-
 routes:
   - from: https://tools.sandbox.internal
     to: http://tool-server:8080
     mcp: true
-    policy:
-      # No allow block => permissive (seed). A tool-policy fix typically keeps
-      # allow permissive and adds targeted deny rules.
-      # allow:
-      #   and:
-      #     - mcp_tool: { is: lookup_order }
-      #
-      # Example of the fix the Blue Agent is expected to promote:
-      # deny:
-      #   or:
-      #     - and:
-      #         - mcp_tool: { is: admin_reset }
-      #         - claim/human_confirmed: { is: false }
-      #     - and:
-      #         - mcp_tool: { is: issue_refund }
-      #         - claim/refund_amount: { greater_than: 50 }
+    policy: {}   # permissive seed — no deny rules yet

@@ -1,18 +1,27 @@
-"""Minimal local evaluator for the subset of Pomerium Policy Language (PPL) we use.
+"""Laptop simulator of Pomerium Policy Language (PPL) — NOT Pomerium itself.
 
-This lets the loop run and enforce policy on a laptop WITHOUT a running Pomerium
-container. When USE_POMERIUM=1 the real gateway enforces instead; this evaluator
-implements the same rules so the demo is identical either way:
+This lets the loop run and enforce tool-policy on a laptop with NO running Pomerium
+container and NO external services. It implements the subset of PPL semantics the
+demo relies on, so laptop mode and a real gateway would decide the same way. When
+USE_POMERIUM=1 the real gateway would enforce instead (that path is not implemented
+in this repo — see sandbox/gateway.py and the README).
 
-  * A request needs at least one matching `allow` rule AND zero matching `deny`
-    rules to pass. Deny always overrides allow.
-  * `mcp_tool: is: <name>` matches on the tool name inside a tools/call request.
-  * `claim/<name>: is: <value>` and `claim/<name>: {greater_than: N}` match on
-    the session token claims (human_confirmed, refund_amount, ...).
+Semantics implemented (matching Pomerium):
+  * Deny always overrides allow.
+  * `mcp_tool: {is: <name>}` matches the tool name inside a tools/call request.
+  * `claim/<name>: {is: <value>}` and `claim/<name>: {greater_than: N}` match session
+    claims (human_confirmed, refund_amount, ...).
+
+Documented MVP boundaries (do not mistake for full PPL):
+  * Only `routes[0]` is evaluated. One route in front of the tool server is enough
+    for the MVP; multi-route dispatch is out of scope.
+  * ABSENT `allow` block => PERMISSIVE (fail-open). This is deliberate: the seed
+    policy has no allow/deny, so everything is allowed and the seed defender is
+    vulnerable. A present `allow` block requires at least one matching allow rule.
+  * MALFORMED policy => FAIL CLOSED. Unparseable YAML raises Denied rather than
+    silently allowing.
 
 The Blue Agent edits pomerium/policy.yaml; this reads whatever is live there.
-Keep this evaluator faithful to Pomerium semantics — if it diverges, a policy that
-passes here could fail in the real gateway (or vice versa) and the demo breaks.
 """
 
 from __future__ import annotations
@@ -21,7 +30,7 @@ import yaml
 
 
 class Denied(Exception):
-    """Raised (status 403 analog) when a tool call fails policy evaluation."""
+    """Raised (a 403 analog) when a tool call fails policy evaluation."""
 
     def __init__(self, reason: str):
         super().__init__(reason)
@@ -32,7 +41,6 @@ def _match_criterion(crit: dict, tool: str, claims: dict) -> bool:
     """Evaluate a single PPL criterion against the request + session claims."""
     for key, cond in crit.items():
         if key == "mcp_tool":
-            # {mcp_tool: {is: issue_refund}}
             return isinstance(cond, dict) and cond.get("is") == tool
         if key.startswith("claim/"):
             claim_name = key.split("/", 1)[1]
@@ -47,12 +55,11 @@ def _match_criterion(crit: dict, tool: str, claims: dict) -> bool:
 
 
 def _match_block(block: dict, tool: str, claims: dict) -> bool:
-    """A block is {and: [...]} / {or: [...]} / a bare criterion list."""
+    """A block is {and: [...]} / {or: [...]} / a bare criterion."""
     if "and" in block:
         return all(_match_criterion(c, tool, claims) for c in block["and"])
     if "or" in block:
         return any(_match_block(c, tool, claims) for c in block["or"])
-    # bare criterion
     return _match_criterion(block, tool, claims)
 
 
@@ -68,16 +75,24 @@ def _matches_any(rule, tool: str, claims: dict) -> bool:
 def evaluate(policy_yaml: str, tool: str, claims: dict) -> None:
     """Raise Denied if the tool call is not permitted by the live policy.
 
-    `claims` typically includes the tool-call args promoted to claims, e.g.
+    `claims` includes request context promoted to claims, e.g.
     {"human_confirmed": False, "refund_amount": 500}.
     """
-    policy = yaml.safe_load(policy_yaml) or {}
-    routes = policy.get("routes", [])
+    if not (policy_yaml or "").strip():
+        return  # empty policy => allow (pre-seed / no restrictions)
+
+    try:
+        policy = yaml.safe_load(policy_yaml) or {}
+    except yaml.YAMLError as e:
+        # Fail closed: an unparseable policy must not silently allow everything.
+        raise Denied(f"malformed policy: {e}") from e
+
+    routes = policy.get("routes") or []
     if not routes:
-        return  # no policy => allow (seed behaviour before any tool-policy fix)
+        return  # no routes => allow (seed behaviour before any tool-policy fix)
 
     # MVP: single route in front of the tool server.
-    pol = routes[0].get("policy", {})
+    pol = routes[0].get("policy") or {}
     allow = pol.get("allow")
     deny = pol.get("deny")
 
@@ -85,7 +100,6 @@ def evaluate(policy_yaml: str, tool: str, claims: dict) -> None:
     if _matches_any(deny, tool, claims):
         raise Denied(f"deny rule matched for tool '{tool}'")
 
-    # Need at least one allow match. If no allow section exists at all, default
-    # to permissive so the seed policy (pre-hardening) lets everything through.
+    # A present allow block requires at least one match. Absent allow => permissive.
     if allow is not None and not _matches_any(allow, tool, claims):
         raise Denied(f"no allow rule matched for tool '{tool}'")
