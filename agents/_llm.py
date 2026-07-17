@@ -6,16 +6,16 @@ slice of our own state, returning structured JSON. That's what makes the loop
 debuggable and demoable instead of an opaque conversation.
 
 This module is only reached in DEMO_MODE=live. The deterministic demo path never
-imports `anthropic` (the import is lazy, inside json_call), so tests and
-`python main.py demo` run with no API key and no network.
+imports an LLM SDK (the client is built lazily in agents/llm_client.py), so tests and
+the deterministic demo run with no API key, no AWS creds, and no network.
+
+Backend (Anthropic API vs Amazon Bedrock) is chosen by LLM_BACKEND — see
+agents/llm_client.py.
 
 Hardening:
-  * clear error if ANTHROPIC_API_KEY is missing (instead of a deep SDK stack trace)
+  * clear error if required credentials are missing (instead of a deep SDK stack trace)
   * validate the parsed dict against the schema's required keys
   * retry once on malformed / schema-violating JSON, then raise a descriptive error
-
-Note: on Opus 4.8 the temperature / top_p params are removed (they 400). We rely on a
-strict json_schema output format, not a temperature knob, for stable structure.
 """
 
 from __future__ import annotations
@@ -23,18 +23,19 @@ from __future__ import annotations
 import json
 import os
 
-_MODEL = os.getenv("AGENT_MODEL", "claude-opus-4-8")
+from agents.llm_client import backend, make_client, model_id
 
 
 class LLMError(RuntimeError):
-    """Raised for a missing key or a response we could not coerce to valid JSON."""
+    """Raised for missing credentials or a response we could not coerce to valid JSON."""
 
 
-def _require_key() -> None:
-    if not os.getenv("ANTHROPIC_API_KEY"):
+def _require_creds() -> None:
+    if backend() == "anthropic" and not os.getenv("ANTHROPIC_API_KEY"):
         raise LLMError(
-            "ANTHROPIC_API_KEY is not set. Set it for DEMO_MODE=live, or run the "
-            "reproducible path with DEMO_MODE=deterministic (e.g. `python main.py demo`)."
+            "ANTHROPIC_API_KEY is not set. Set it for LLM_BACKEND=anthropic, set "
+            "LLM_BACKEND=bedrock to use AWS Bedrock, or run the reproducible path with "
+            "DEMO_MODE=deterministic (e.g. `python main.py demo`)."
         )
 
 
@@ -59,15 +60,13 @@ def json_call(
     be valid JSON matching the schema. Retries once if the model still returns
     something unparseable or schema-incomplete.
     """
-    _require_key()
-    import anthropic  # lazy: keeps the deterministic path free of the dependency
-
-    client = client or anthropic.Anthropic()
+    _require_creds()
+    client = client or make_client()
 
     last_err: Exception | None = None
-    for attempt in range(2):
+    for _attempt in range(2):
         resp = client.messages.create(
-            model=_MODEL,
+            model=model_id(),
             max_tokens=max_tokens,
             system=system,
             messages=[{"role": "user", "content": user}],

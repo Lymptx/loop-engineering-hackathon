@@ -1,5 +1,5 @@
 # Core
-anthropic>=0.116.0        # Claude API — Red/Blue agents + target agent tool_use loop
+anthropic[bedrock]>=0.116.0  # Claude API + Amazon Bedrock (boto3) for LLM_BACKEND=bedrock
 mcp>=1.2.0                # Model Context Protocol — tool server
 pydantic>=2.6             # structured JSON validation for agent outputs
 python-dotenv>=1.0        # load ANTHROPIC_API_KEY from .env
