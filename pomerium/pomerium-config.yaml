@@ -1,0 +1,24 @@
+# Pomerium base config (step 6 — gateway mode). Laptop mode does not need this.
+#
+# Pomerium sits as the MCP gateway in front of the tool server. The target agent
+# never talks to the tool server directly — every tools/call request passes
+# through here first, and Pomerium enforces whatever policy.yaml currently says.
+#
+# Pomerium hot-reloads route/policy config from file on change (the right choice
+# for a single-instance hackathon deployment — avoid the k8s/etcd dynamic-config
+# reload-lag path on demo day).
+
+# The routes live in policy.yaml (loaded via the include below in real Pomerium
+# you'd inline them; kept split so the Blue Agent only ever rewrites policy.yaml).
+authenticate_service_url: https://authenticate.sandbox.internal
+
+# For the hackathon we skip a real OIDC IdP. The test harness mints a short-lived
+# signed JWT carrying claims like human_confirmed=false (attacker) / true
+# (legitimate) and passes it as the session token. See sandbox/gateway.py.
+#
+# TODO(step 6): set the signing key / shared secret so Pomerium validates the JWT
+# minted with POMERIUM_JWT_SECRET.
+
+# Routes are defined in policy.yaml. In a real single-file Pomerium config you
+# would place the `routes:` block here; this repo keeps it in policy.yaml so the
+# Blue Agent's tool-policy diffs touch exactly one file.

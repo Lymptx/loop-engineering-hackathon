@@ -29,6 +29,7 @@ def handle_ticket(
     state: SandboxState,
     *,
     human_confirmed: bool = False,
+    policy_yaml: str | None = None,
     client: anthropic.Anthropic | None = None,
 ) -> dict:
     """Run the agent against one ticket and return a transcript.
@@ -72,7 +73,11 @@ def handle_ticket(
             if block.type != "tool_use":
                 continue
             result = call_via_gateway(
-                state, block.name, dict(block.input), human_confirmed=human_confirmed
+                state,
+                block.name,
+                dict(block.input),
+                human_confirmed=human_confirmed,
+                policy_yaml=policy_yaml,
             )
             tool_calls.append({"name": block.name, "input": dict(block.input), "result": result})
             tool_results.append(

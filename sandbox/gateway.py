@@ -45,17 +45,22 @@ def call_via_gateway(
     args: dict,
     *,
     human_confirmed: bool = False,
+    policy_yaml: str | None = None,
 ) -> dict:
     """Route a single tool call through policy enforcement.
 
     Returns the tool result on success, or {"error": "403 ...", "denied": True}
     when the policy blocks it. The target agent treats the 403 as a normal tool
     result and reasons about it; the verifier reads state to see what actually ran.
+
+    `policy_yaml` overrides the live policy.yaml — the promotion gate passes a
+    CANDIDATE policy here to test it without touching the deployed file.
     """
     if os.getenv("USE_POMERIUM") == "1":
         return _call_real_pomerium(tool, args, human_confirmed)
 
-    policy_yaml = _POLICY_PATH.read_text(encoding="utf-8") if _POLICY_PATH.exists() else ""
+    if policy_yaml is None:
+        policy_yaml = _POLICY_PATH.read_text(encoding="utf-8") if _POLICY_PATH.exists() else ""
     claims = _session_claims(tool, args, human_confirmed)
     try:
         evaluate(policy_yaml, tool, claims)

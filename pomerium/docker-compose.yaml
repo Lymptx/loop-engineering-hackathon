@@ -1,0 +1,29 @@
+# Step 6 only. Brings up Pomerium (MCP gateway) in front of the tool server so
+# tool calls are enforced by the real gateway instead of pomerium/ppl.py.
+#
+#   docker compose -f pomerium/docker-compose.yaml up
+#   USE_POMERIUM=1 python main.py run-round
+#
+# Until step 6, run in laptop mode (USE_POMERIUM=0) — no containers needed.
+
+services:
+  pomerium:
+    image: pomerium/pomerium:latest
+    volumes:
+      - ./pomerium-config.yaml:/pomerium/config.yaml:ro
+      - ./policy.yaml:/pomerium/policy.yaml   # hot-reloaded on change
+    ports:
+      - "443:443"
+    command: ["-config", "/pomerium/config.yaml"]
+    depends_on:
+      - tool-server
+
+  tool-server:
+    build:
+      context: ..
+      dockerfile: infra/tool-server.Dockerfile   # TODO(step 6): add this Dockerfile
+    environment:
+      - PYTHONUNBUFFERED=1
+    expose:
+      - "8080"
+    command: ["python", "-m", "sandbox.tool_server"]

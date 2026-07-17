@@ -1,0 +1,33 @@
+# Buildkite is the top-level CI/CD orchestrator — this matches the project's
+# framing as a "security CI/CD system" literally. Buildkite doesn't call Bedrock
+# or Fargate directly; each step triggers a Lambda (see infra/lambdas/).
+#
+# The pipeline UI becomes the demo screen: judges watch steps go green/red in
+# real time. A rejected candidate (the prompt-only fix) shows up as a failed
+# gate step with the exact hidden-attack test that still failed in the log.
+#
+# Step 6 only. Laptop mode runs the same logic via `python main.py run-n`.
+
+steps:
+  - label: ":robot_face: generate attack"
+    command: python -m infra.lambdas.generate_attack   # Red Agent (Bedrock)
+
+  - wait
+
+  - label: ":dart: run attack"
+    command: python -m infra.lambdas.run_attack         # target agent, capture transcript
+
+  - wait
+
+  - label: ":mag: verify"
+    command: python -m infra.lambdas.verify             # deterministic verifier
+
+  - wait
+
+  - label: ":wrench: RCA + candidate"
+    command: python -m infra.lambdas.rca_and_candidate  # Blue Agent (Bedrock)
+
+  - wait
+
+  - label: ":lock: promote or reject"
+    command: python -m infra.lambdas.promote_or_reject  # hidden + benign gate, deploy on pass
