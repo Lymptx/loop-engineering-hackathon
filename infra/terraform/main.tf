@@ -1,21 +1,30 @@
-# AWS storage for Agent Immune CI (step 6). Stub — fill in provider/region/tags.
+# Agent Immune CI — AWS infrastructure (reconciled to match the deployed state).
 #
-# Division of labor (see basic_plan.md §10):
-#   DynamoDB  — attack lineage + version history (key-value/document shaped)
-#   S3        — full transcripts per attempt (large, append-only, rarely queried)
-#   Fargate   — the resettable sandbox (defined separately; needs a full env per run)
-#
-# The storage/db.py interface (append_attack / all_attacks / save_defender /
-# all_defenders / save_transcript) is intentionally small so a DynamoDB/S3 backend
-# drops in behind it without touching the loop.
+# This file was rebuilt from terraform.tfstate so `terraform plan` is clean: it now
+# describes exactly what is already deployed (2 DynamoDB tables, the transcripts S3
+# bucket + ownership controls, and the Lambda IAM role/policy). The cockpit event
+# table lives in cockpit.tf. A `terraform plan` should show only the Cockpit table as
+# "to add" and 0 to change / 0 to destroy.
 
 terraform {
+  required_version = ">= 1.5"
   required_providers {
     aws = { source = "hashicorp/aws", version = "~> 5.0" }
   }
 }
 
-# provider "aws" { region = "us-east-1" }   # TODO: set region + credentials
+variable "aws_region" {
+  type    = string
+  default = "us-east-1"
+}
+
+provider "aws" {
+  region = var.aws_region
+}
+
+data "aws_caller_identity" "current" {}
+
+# --- DynamoDB: the CLI loop's attack library + defender history -------------
 
 resource "aws_dynamodb_table" "attack_strategies" {
   name         = "AttackStrategies"
@@ -26,8 +35,6 @@ resource "aws_dynamodb_table" "attack_strategies" {
     name = "attack_id"
     type = "S"
   }
-  # Fields (non-key, schemaless in DynamoDB): family, parent_id,
-  # success_rate_by_defender_version, next_area_to_explore.
 }
 
 resource "aws_dynamodb_table" "defender_versions" {
@@ -39,17 +46,89 @@ resource "aws_dynamodb_table" "defender_versions" {
     name = "version"
     type = "S"
   }
-  # Fields: prompt_diff, policy_diff, promoted_at, test_results.
 }
+
+# --- S3: per-attempt transcripts -------------------------------------------
 
 resource "aws_s3_bucket" "transcripts" {
-  bucket = "agent-immune-ci-transcripts"   # TODO: make unique per account
-  # Objects: transcripts/{round}/{attack_id}.json — the audit trail shown to judges.
+  bucket = "agent-immune-ci-transcripts-${data.aws_caller_identity.current.account_id}"
+
+  tags = {
+    Project   = "agent-immune-ci"
+    ManagedBy = "terraform"
+  }
 }
 
-# TODO(step 6):
-#   * ECS/Fargate task definition with three containers:
-#       target-agent, tool-server (MCP behind Pomerium), verifier.
-#     Each round = a fresh task from a clean snapshot (orders + canary reset).
-#   * Lambda functions (infra/lambdas/) wired to the Buildkite steps.
-#   * IAM roles: Bedrock invoke (Red/Blue), DynamoDB rw, S3 put, Fargate run-task.
+resource "aws_s3_bucket_ownership_controls" "transcripts" {
+  bucket = aws_s3_bucket.transcripts.id
+
+  rule {
+    object_ownership = "BucketOwnerEnforced"
+  }
+}
+
+# --- IAM: execution role for the (future) Buildkite/Lambda pipeline ---------
+# Not used by the current app runtime (which runs under the agent-immune-dev user),
+# but part of the deployed infra, so it's captured here to keep state consistent.
+
+resource "aws_iam_role" "lambda_exec" {
+  name = "agent-immune-ci-lambda-exec"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Action    = "sts:AssumeRole"
+      Effect    = "Allow"
+      Principal = { Service = "lambda.amazonaws.com" }
+    }]
+  })
+
+  tags = {
+    Project   = "agent-immune-ci"
+    ManagedBy = "terraform"
+  }
+}
+
+resource "aws_iam_policy" "lambda_storage" {
+  name = "agent-immune-ci-lambda-storage"
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "dynamodb:PutItem",
+          "dynamodb:GetItem",
+          "dynamodb:Scan",
+          "dynamodb:Query",
+          "dynamodb:UpdateItem",
+        ]
+        Resource = [
+          aws_dynamodb_table.attack_strategies.arn,
+          aws_dynamodb_table.defender_versions.arn,
+        ]
+      },
+      {
+        Effect   = "Allow"
+        Action   = ["s3:PutObject", "s3:PutObjectAcl"]
+        Resource = "${aws_s3_bucket.transcripts.arn}/*"
+      },
+      {
+        Effect   = "Allow"
+        Action   = ["bedrock:InvokeModel", "bedrock:InvokeModelWithResponseStream"]
+        Resource = "*"
+      },
+    ]
+  })
+}
+
+resource "aws_iam_role_policy_attachment" "lambda_basic" {
+  role       = aws_iam_role.lambda_exec.name
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+}
+
+resource "aws_iam_role_policy_attachment" "lambda_storage" {
+  role       = aws_iam_role.lambda_exec.name
+  policy_arn = aws_iam_policy.lambda_storage.arn
+}
