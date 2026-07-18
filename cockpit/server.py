@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import json
 import mimetypes
+import os
 import threading
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -14,6 +15,7 @@ from urllib.parse import parse_qs, urlparse
 from cockpit import demo, store, subject_view
 
 _STATIC_DIR = Path(__file__).parent / "static"
+_POMERIUM_CONFIG = Path(__file__).parents[1] / "pomerium" / "generated-config.yaml"
 _DEMO_THREAD: threading.Thread | None = None
 _STOP_EVENT = threading.Event()
 _THREAD_LOCK = threading.Lock()
@@ -53,6 +55,28 @@ class CockpitHandler(BaseHTTPRequestHandler):
             return
         if path == "/api/demo/target-agent":
             self._send_json(subject_view.snapshot())
+            return
+        if path == "/api/demo/gateway-status":
+            live = os.getenv("USE_POMERIUM") == "1"
+            self._send_json(
+                {
+                    "mode": "pomerium" if live else "ppl_simulator",
+                    "label": "Pomerium MCP" if live else "PPL simulator",
+                    "pomerium_url": (
+                        os.getenv("POMERIUM_URL", "http://127.0.0.1:18081/mcp")
+                        if live
+                        else None
+                    ),
+                    "config_generated": _POMERIUM_CONFIG.exists(),
+                    "identity": (
+                        "service_account"
+                        if os.getenv("POMERIUM_SERVICE_ACCOUNT_TOKEN")
+                        else "local_accept"
+                    )
+                    if live
+                    else "request_context_claims",
+                }
+            )
             return
         self._send_json({"error": "not found"}, status=HTTPStatus.NOT_FOUND)
 

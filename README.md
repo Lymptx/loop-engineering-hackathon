@@ -83,38 +83,61 @@ demo run with it uninstalled and no key set. Live mode swaps in real Claude call
 
 ---
 
-## Pomerium / MCP — honest status
+## Pomerium / MCP — two enforcement lanes
 
-Default demos/tests still use [`pomerium/ppl.py`](./pomerium/ppl.py), a laptop
-simulator of Pomerium Policy Language semantics. This keeps `make demo` and
-`make test` deterministic, offline, and fast.
+Pomerium is the external enforcement plane for privileged agent tools. Blue promotes
+[`pomerium/policy.yaml`](./pomerium/policy.yaml); every target tool call crosses the
+gateway contract and receives an explicit allow/deny decision.
 
-`USE_POMERIUM=1` now routes real tool calls through a local Docker Pomerium gateway:
+| Lane | Setting | Enforcement | Purpose |
+|---|---|---|---|
+| deterministic (default) | `USE_POMERIUM=0` | [`pomerium/ppl.py`](./pomerium/ppl.py) | offline CI, claim-aware candidate gates |
+| real MCP gateway | `USE_POMERIUM=1` | `pomerium/pomerium:main` → [`sandbox/tool_server.py`](./sandbox/tool_server.py) | judge-visible native `mcp_tool` enforcement and audit logs |
+
+The simulator implements deny-overrides-allow, `mcp_tool`, and request-context claims
+such as `human_confirmed` and `refund_amount`. Real local mode uses Pomerium's
+experimental MCP proxy and native tool-name policies. Because local mode has no IdP,
+[`pomerium/local_config.py`](./pomerium/local_config.py) conservatively converts
+claim-conditioned high-risk branches to tool-name denies. It does **not** claim JWT
+or per-request claim parity.
+
+Real-gateway proof (Docker Desktop required):
 
 ```bash
-make pomerium-up
-USE_POMERIUM=1 POMERIUM_URL=http://127.0.0.1:18081/mcp python main.py run-round
-make pomerium-smoke
+python -m pomerium.local_config
+docker compose -f pomerium/docker-compose.yaml up --build
+# in another terminal:
+python scripts/pomerium_smoke.py
+# application-level proof with enforcement metadata + audit events:
+USE_POMERIUM=1 python scripts/pomerium_judge_demo.py
 ```
 
-The real path is:
+The smoke script proves both paths: `lookup_order` is allowed and
+`internal_diagnostics` is denied by Pomerium. Set
+`POMERIUM_SERVICE_ACCOUNT_TOKEN` only when connecting to an authenticated Pomerium
+route; no token is needed for the local `allow: accept` judge proof.
 
+### Pomerium Zero
+
+The root [`compose.yaml`](./compose.yaml) runs the Pomerium Zero connector, the
+official Verify app, and this project's MCP tool server. Put the Zero enrollment
+token in the gitignored root `.env`:
+
+```dotenv
+POMERIUM_ZERO_TOKEN=replace-with-a-fresh-token
 ```
-Target Agent -> sandbox.gateway -> Pomerium MCP route -> sandbox.tool_server -> tools.py
-```
 
-[`pomerium/local_config.py`](./pomerium/local_config.py) turns the live defense
-artifact [`pomerium/policy.yaml`](./pomerium/policy.yaml) into
-[`pomerium/generated-config.yaml`](./pomerium/generated-config.yaml), the complete
-local config Docker Pomerium reads. Pomerium authorizer logs include `mcp-method`,
-`mcp-tool`, and `mcp-tool-parameters`.
+Then run `docker compose up -d`. In Pomerium Zero, configure the MCP route upstream
+as `http://tool-server:8080/mcp` and enable MCP server mode plus the native
+`mcp_tool` deny policy. The token enrolls the connector; it is not the per-request
+service-account token used by an MCP client.
 
-Boundary: local Docker mode uses `allow: accept` so agent-to-tool calls can run
-without wiring Google/Okta/OIDC. That means no browser login prompt in the demo
-path. Browser authorization requires a real HTTPS route plus an identity provider
-or Pomerium service-account flow. Also, real Pomerium MCP PPL primarily enforces
-tool-name rules (`mcp_tool`); the in-process simulator still covers hackathon-only
-request-claim checks like `refund_amount > 50`.
+The golden `python main.py demo` remains deterministic by design. Candidate policies
+are evaluated in-process before promotion; the promoted policy regenerates
+`pomerium/generated-config.yaml` for the real gateway lane.
+
+Documented simulator boundaries: only `routes[0]` is evaluated; absent `allow` is
+permissive; malformed policy fails closed.
 
 ---
 

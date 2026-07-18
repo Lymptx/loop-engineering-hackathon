@@ -1353,6 +1353,7 @@ def _record_synthetic_attack(run_id: str, *, attempt_num: int, bundle_id: str,
         "user_input": objective,
         "carrier": carrier,
         "policy": defender_version,
+        "enforcement_layer": "deterministic_policy_contract",
         "tool_calls": [{"tool": node} for node in path if "_" in node],
         "mutation": mutation or {},
         "verifier": verifier_result,
@@ -1909,6 +1910,7 @@ def _execute_email_attack(case: dict, policy: EmailPolicy) -> tuple[dict, dict]:
         "user_input": case["ticket"],
         "carrier": "customer_ticket",
         "policy": policy.label,
+        "enforcement_layer": "email_policy_compiler",
         "tool_calls": [
             {
                 "tool": "crm_get_customer",

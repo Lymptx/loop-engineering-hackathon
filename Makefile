@@ -4,7 +4,7 @@
 PYTHON ?= .venv/bin/python
 PYTHON_BOOTSTRAP ?= python3.12
 
-.PHONY: install test demo evo cockpit live-demo matrix reset status pomerium-config pomerium-up pomerium-down pomerium-logs pomerium-smoke
+.PHONY: install test demo evo cockpit live-demo matrix reset status pomerium-config pomerium-up pomerium-down pomerium-logs pomerium-smoke pomerium-judge-demo
 
 $(PYTHON):
 	$(PYTHON_BOOTSTRAP) -m venv .venv
@@ -52,12 +52,8 @@ pomerium-down:
 pomerium-logs:
 	docker compose -f pomerium/docker-compose.yaml logs -f pomerium
 
-pomerium-smoke:
-	@for i in $$(seq 1 60); do \
-		curl -fsS http://127.0.0.1:18081/mcp \
-			-H 'Content-Type: application/json' \
-			--data '{"jsonrpc":"2.0","id":"smoke","method":"tools/call","params":{"name":"lookup_order","arguments":{"order_id":"A1001"}}}' && exit 0; \
-		sleep 1; \
-	done; \
-	echo "Pomerium smoke test failed: is make pomerium-up running?" >&2; \
-	exit 1
+pomerium-smoke: pomerium-config
+	$(PYTHON) scripts/pomerium_smoke.py
+
+pomerium-judge-demo: pomerium-config
+	USE_POMERIUM=1 $(PYTHON) scripts/pomerium_judge_demo.py

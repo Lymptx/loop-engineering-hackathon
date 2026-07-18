@@ -1,12 +1,16 @@
 """The tool-call gateway the target agent goes through — never the tool server directly.
 
-In laptop mode (USE_POMERIUM=0, the default and the golden-demo path) this enforces
-the tool-policy IN-PROCESS via pomerium/ppl.py — a local simulator of Pomerium PPL
-semantics, not Pomerium itself — then dispatches to sandbox/tools.py.
+There are two explicit enforcement lanes:
 
-Gateway mode (USE_POMERIUM=1) is NOT implemented in this repo: it would forward a
-tools/call MCP request to a running Pomerium that enforces the same policy. The stub
-below raises a clear error so nothing silently pretends a real gateway is in play.
+* ``USE_POMERIUM=0`` (default) evaluates the Blue-authored policy in-process with
+  ``pomerium/ppl.py``. This deterministic lane supports the demo's request-context
+  claims and is used by tests and candidate promotion gates.
+* ``USE_POMERIUM=1`` forwards live-policy MCP ``tools/call`` requests through a
+  real local Pomerium proxy to ``sandbox/tool_server.py``. Pomerium enforces the
+  generated tool-level policy and produces gateway audit logs.
+
+Passing ``policy_yaml`` explicitly always selects the simulator. That keeps
+unpromoted candidate policies isolated from the live Pomerium configuration.
 
 Either way, the contract is identical: a denied call returns a 403-style result,
 and the verifier can tell an *enforced* block apart from the agent simply choosing
@@ -147,6 +151,7 @@ def _annotate_execution_context(
         "policy_decision": "deny" if result.get("denied") else "allow",
         "claims": dict(claims),
         "authorization_source": authorization_source,
+        "enforcement_layer": result.get("enforcement_layer", "ppl_simulator"),
     }
     state.audit_events.append(event)
 
@@ -232,13 +237,18 @@ def call_via_gateway(
     try:
         evaluate(policy_yaml, tool, claims)
     except Denied as d:
-        result = {"error": f"403 Forbidden: {d.reason}", "denied": True}
+        result = {
+            "error": f"403 Forbidden: {d.reason}",
+            "denied": True,
+            "enforcement_layer": "ppl_simulator",
+        }
         _annotate_execution_context(
             state, tool, args, result, claims,
             session_id=session_id, authorization_source=authorization_source,
         )
         return result
     result = call_tool(state, tool, args)
+    result["enforcement_layer"] = "ppl_simulator"
     _annotate_execution_context(
         state, tool, args, result, claims,
         session_id=session_id, authorization_source=authorization_source,
@@ -246,12 +256,21 @@ def call_via_gateway(
     return result
 
 
-def _post_json(url: str, payload: dict, *, timeout: float = 5.0) -> tuple[int, dict | str]:
+def _post_json(
+    url: str,
+    payload: dict,
+    *,
+    timeout: float = 5.0,
+    bearer_token: str | None = None,
+) -> tuple[int, dict | str]:
     data = json.dumps(payload).encode("utf-8")
+    headers = {"content-type": "application/json", "accept": "application/json"}
+    if bearer_token:
+        headers["authorization"] = f"Bearer {bearer_token}"
     req = request.Request(
         url,
         data=data,
-        headers={"content-type": "application/json", "accept": "application/json"},
+        headers=headers,
         method="POST",
     )
     try:
@@ -335,13 +354,18 @@ def _call_real_pomerium(
         "method": "tools/call",
         "params": {"name": tool, "arguments": args},
     }
-    status, body = _post_json(url, payload)
+    status, body = _post_json(
+        url,
+        payload,
+        bearer_token=os.getenv("POMERIUM_SERVICE_ACCOUNT_TOKEN"),
+    )
 
     if status in {401, 403}:
         result = {
             "error": f"{status} Forbidden by Pomerium",
             "denied": True,
             "pomerium_status": status,
+            "enforcement_layer": "pomerium",
         }
         _annotate_execution_context(
             state, tool, args, result, claims,
@@ -352,6 +376,7 @@ def _call_real_pomerium(
         raise RuntimeError(f"Pomerium gateway returned HTTP {status}: {body}")
 
     result = _extract_tool_result(body)
+    result["enforcement_layer"] = "pomerium"
     if not result.get("error"):
         # Keep the verifier's local state contract intact while the real gateway
         # proves that the tool call traversed Pomerium.

@@ -15,10 +15,14 @@
 # The generated config uses insecure local HTTP on 127.0.0.1:18081 and injects
 # `allow: accept` so agent-to-tool calls can be tested without OIDC.
 
-# Browser/OIDC authorization is intentionally not configured in local Docker mode.
-# If you want an interactive login prompt, replace the generated `allow: accept`
-# route with a normal authenticated Pomerium route and configure a real IdP or
-# service-account token flow.
+# Local Docker mode deliberately uses ``allow: accept`` so it can prove that real
+# MCP traffic traverses Pomerium and native ``mcp_tool`` deny rules fire without
+# requiring an external IdP. The in-process simulator models additional request
+# context (human_confirmed, refund_amount).
+#
+# For identity-aware production use, configure a Pomerium IdP or service account.
+# ``sandbox/gateway.py`` can send ``POMERIUM_SERVICE_ACCOUNT_TOKEN`` as a Bearer
+# token. Do not describe local accept mode as claim-aware authentication.
 
 # Routes are defined in policy.yaml. In a real single-file Pomerium config you
 # would place the `routes:` block here; this repo keeps it in policy.yaml so the

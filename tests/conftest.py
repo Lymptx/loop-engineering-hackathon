@@ -27,6 +27,11 @@ def _isolate(tmp_path, monkeypatch):
     monkeypatch.setattr(db, "_DEFENDERS", data / "defenders.json")
     monkeypatch.setattr(db, "_TRANSCRIPTS", data / "transcripts")
     monkeypatch.setattr(orchestrator, "_POLICY_PATH", tmp_path / "policy.yaml")
+    monkeypatch.setattr(
+        orchestrator,
+        "_POMERIUM_CONFIG_PATH",
+        tmp_path / "generated-config.yaml",
+    )
     monkeypatch.setattr(version_store, "_DATA_DIR", data)
     monkeypatch.setattr(version_store, "_VERSIONS", data / "capability_versions.json")
     monkeypatch.setattr(defender_store, "_DATA_DIR", data)

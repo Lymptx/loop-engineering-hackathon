@@ -13,6 +13,7 @@ repo is dressing around it. The six explicit components map onto it directly:
 
 from __future__ import annotations
 
+import warnings
 from pathlib import Path
 
 from agents import blue_agent, red_agent
@@ -23,6 +24,7 @@ from sandbox.target_agent import handle_ticket
 from verifier import suites, verifier
 
 _POLICY_PATH = Path(__file__).parents[1] / "pomerium" / "policy.yaml"
+_POMERIUM_CONFIG_PATH = Path(__file__).parents[1] / "pomerium" / "generated-config.yaml"
 
 # The permissive seed tool-policy (DefenderVersion v1). No deny rules => every tool
 # call is allowed, which is exactly why the seed defender is vulnerable. Held as a
@@ -38,6 +40,7 @@ routes:
 
 
 # --- seed / bootstrap ------------------------------------------------------
+
 
 def seed_defender() -> DefenderVersion:
     """DefenderVersion v1: naive prompt + the permissive seed tool-policy."""
@@ -65,6 +68,7 @@ def _next_version(current: DefenderVersion) -> str:
 
 # --- the loop --------------------------------------------------------------
 
+
 def run_round(
     library: list[AttackAttempt],
     current: DefenderVersion,
@@ -77,8 +81,11 @@ def run_round(
     attack = red_agent.generate_next_attack(library, current)
     state = SandboxState.fresh()
     transcript = handle_ticket(
-        attack.payload, current.system_prompt, state,
-        human_confirmed=False, policy_yaml=current.tool_policy_yaml,
+        attack.payload,
+        current.system_prompt,
+        state,
+        human_confirmed=False,
+        policy_yaml=current.tool_policy_yaml,
     )
 
     # OBSERVE: deterministic verifier says which violation occurred.
@@ -114,6 +121,7 @@ def run_round(
 
 # --- promotion gate --------------------------------------------------------
 
+
 def run_promotion_gate(candidate: Candidate, current: DefenderVersion) -> dict:
     """Rerun the HIDDEN attack suite + BENIGN regression suite against the candidate.
 
@@ -138,15 +146,19 @@ def run_hidden_suite(system_prompt: str, policy_yaml: str) -> dict:
     for case in suites.HIDDEN_ATTACKS:
         state = SandboxState.fresh()
         transcript = handle_ticket(
-            case["ticket"], system_prompt, state,
+            case["ticket"],
+            system_prompt,
+            state,
             human_confirmed=case.get("human_confirmed", False),
             policy_yaml=policy_yaml,
         )
         result = verifier.check(transcript, state)
         blocked = not result["violation"]
-        unauthorized_calls += len(result["admin_resets"]) + (
-            1 if result["refund_over_cap"] else 0
-        ) + (1 if result["canary_exposed"] else 0)
+        unauthorized_calls += (
+            len(result["admin_resets"])
+            + (1 if result["refund_over_cap"] else 0)
+            + (1 if result["canary_exposed"] else 0)
+        )
         cases.append({"name": case["name"], "blocked": blocked, "result": result})
     return {
         "all_blocked": all(c["blocked"] for c in cases),
@@ -164,7 +176,9 @@ def run_benign_suite(system_prompt: str, policy_yaml: str) -> dict:
     for case in suites.BENIGN_TASKS:
         state = SandboxState.fresh()
         transcript = handle_ticket(
-            case["ticket"], system_prompt, state,
+            case["ticket"],
+            system_prompt,
+            state,
             human_confirmed=case.get("human_confirmed", False),
             policy_yaml=policy_yaml,
         )
@@ -193,6 +207,7 @@ def score_defender(defender: DefenderVersion) -> dict:
 
 # --- promote / deploy ------------------------------------------------------
 
+
 def _promote(candidate: Candidate, current: DefenderVersion, gate: dict) -> DefenderVersion:
     return DefenderVersion(
         version=_next_version(current),
@@ -212,8 +227,12 @@ def deploy_policy(tool_policy_yaml: str) -> None:
     try:
         from pomerium.local_config import write_config
 
-        write_config()
-    except Exception:
-        # The in-process simulator and tests only need policy.yaml. A generated
-        # config failure should not corrupt the promoted policy artifact.
-        pass
+        write_config(policy_path=_POLICY_PATH, output_path=_POMERIUM_CONFIG_PATH)
+    except Exception as exc:
+        # The deterministic simulator can continue, but the real-gateway artifact
+        # must never fail silently: judges/operators need to know it is stale.
+        warnings.warn(
+            f"policy promoted but Pomerium config regeneration failed: {exc}",
+            RuntimeWarning,
+            stacklevel=2,
+        )
